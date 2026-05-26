@@ -12,6 +12,10 @@ import { Redis } from "@upstash/redis";
 function createRedis(): Redis | null {
   if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
     if (process.env.NODE_ENV === "production") {
+      if (process.env.NEXT_PHASE === "phase-production-build") {
+        console.warn("[ratelimit] Upstash env vars missing — using null fallback for Next.js build phase");
+        return null;
+      }
       throw new Error("UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN are required in production.");
     }
     // Dev fallback — in-memory Redis mock isn't available, log warning and skip

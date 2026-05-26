@@ -18,8 +18,6 @@ const ENV_SPECS: EnvSpec[] = [
   { key: "DATABASE_URL",                       required: "production",  description: "Supabase PostgreSQL connection string (pooler)" },
   { key: "NEXT_PUBLIC_SUPABASE_URL",           required: "production",  description: "Supabase project URL" },
   { key: "NEXT_PUBLIC_SUPABASE_ANON_KEY",      required: "production",  description: "Supabase anon public key" },
-  { key: "UPSTASH_REDIS_REST_URL",             required: "production",  description: "Upstash Redis REST URL" },
-  { key: "UPSTASH_REDIS_REST_TOKEN",           required: "production",  description: "Upstash Redis REST token" },
 
   // Optional (feature-gated)
   { key: "ANTHROPIC_API_KEY",                  required: "optional",    description: "Anthropic API key (AI Doctor feature)" },

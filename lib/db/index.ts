@@ -14,14 +14,6 @@ function createClient(): postgres.Sql {
 
   if (!url || url.includes("placeholder")) {
     if (process.env.NODE_ENV === "production") {
-      if (process.env.NEXT_PHASE === "phase-production-build") {
-        console.warn("[db] DATABASE_URL not set — using placeholder for Next.js build phase.");
-        return postgres("postgresql://localhost:5432/dev_placeholder", {
-          max: 0,
-          connect_timeout: 1,
-          idle_timeout: 1,
-        });
-      }
       throw new Error("DATABASE_URL is required in production.");
     }
     // Dev without DB — return a client that gives clear errors on query

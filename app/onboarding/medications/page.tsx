@@ -157,6 +157,13 @@ export default function OnboardingMedicationsPage() {
             <ArrowRight size={18} aria-hidden="true" />
           </Link>
         </div>
+
+        <Link
+          href="/onboarding/devices"
+          className="block w-full text-center text-label-sm text-text-tertiary mt-3 hover:text-text-secondary transition-colors"
+        >
+          Skip — I&apos;ll add these later
+        </Link>
       </div>
     </div>
   );

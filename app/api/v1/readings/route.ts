@@ -112,6 +112,54 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // Send SMS to relative on critical (red zone) alerts
+  const criticalAlert = triggeredAlerts.find((a) => a.severity === "critical");
+  if (criticalAlert) {
+    if (isDatabaseConfigured()) {
+      try {
+        const { db, patientProfiles } = await import("@/lib/db");
+        const { eq } = await import("drizzle-orm");
+        const patId = authCtx.patientId as `${string}-${string}-${string}-${string}-${string}`;
+
+        const [profile] = await db
+          .select({
+            name: patientProfiles.name,
+            emergencyContact: patientProfiles.emergencyContact,
+          })
+          .from(patientProfiles)
+          .where(eq(patientProfiles.id, patId))
+          .limit(1);
+
+        if (profile && profile.emergencyContact) {
+          const contact = profile.emergencyContact as { name: string; phone: string; relationship: string } | null;
+          if (contact && contact.phone) {
+            const { sendCriticalAlertSms } = await import("@/lib/sms");
+            void sendCriticalAlertSms(
+              profile.name,
+              contact.name,
+              contact.phone,
+              criticalAlert.message
+            );
+          }
+        }
+      } catch (smsErr) {
+        console.error("[readings:sms] Error retrieving emergency contact:", smsErr);
+      }
+    } else {
+      try {
+        const { sendCriticalAlertSms } = await import("@/lib/sms");
+        void sendCriticalAlertSms(
+          "Arjun Mehta",
+          "Sunita Mehta",
+          "+919876543210",
+          criticalAlert.message
+        );
+      } catch (smsErr) {
+        console.error("[readings:sms] Error sending mock relative alert SMS:", smsErr);
+      }
+    }
+  }
+
   return NextResponse.json(
     {
       data: {

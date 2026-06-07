@@ -21,9 +21,25 @@ import Link from "next/link";
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData>(() => getMockDashboardData());
   const [alerts, setAlerts] = useState<Alert[]>(() => getMockDashboardData().activeAlerts);
+  const [upcomingDoses, setUpcomingDoses] = useState(() => MOCK_UPCOMING_DOSES);
   const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [logModalOpen, setLogModalOpen] = useState(false);
+
+  const markUpcomingDoseTaken = (doseId: string) => {
+    const dose = upcomingDoses.find((d) => d.id === doseId);
+    if (dose) {
+      setData((prev) => ({
+        ...prev,
+        todayMedications: prev.todayMedications.map((m) =>
+          m.name.toLowerCase() === dose.medicationName.toLowerCase()
+            ? { ...m, status: "taken" }
+            : m
+        ),
+      }));
+      setUpcomingDoses((prev) => prev.filter((d) => d.id !== doseId));
+    }
+  };
 
   // ── Simulate real-time streaming (8-second refresh) ──────────────────────
   const refresh = useCallback(() => {
@@ -286,40 +302,48 @@ export default function DashboardPage() {
             Latest Readings
           </h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            <VitalCard
-              label="Blood Glucose"
-              value={String(latestReadings.bloodGlucose)}
-              unit="mg/dL"
-              status={bgStatus}
-              icon="🩸"
-              sublabel="Fasting"
-              animate
-            />
-            <VitalCard
-              label="Blood Pressure"
-              value={`${latestReadings.systolic}/${latestReadings.diastolic}`}
-              unit="mmHg"
-              status={bpStatus}
-              icon="💉"
-              animate
-            />
-            <VitalCard
-              label="Heart Rate"
-              value={String(latestReadings.heartRate)}
-              unit="bpm"
-              status={hrStatus}
-              icon="❤️"
-              animate
-            />
-            <VitalCard
-              label="SpO₂"
-              value={String(latestReadings.spo2)}
-              unit="%"
-              status={spo2Status}
-              icon="💨"
-              sublabel="Blood oxygen"
-              animate
-            />
+            <Link href="/glucose" className="block hover:scale-[1.01] transition-transform">
+              <VitalCard
+                label="Blood Glucose"
+                value={String(latestReadings.bloodGlucose)}
+                unit="mg/dL"
+                status={bgStatus}
+                icon="🩸"
+                sublabel="Fasting"
+                animate
+              />
+            </Link>
+            <Link href="/conditions/hypertension" className="block hover:scale-[1.01] transition-transform">
+              <VitalCard
+                label="Blood Pressure"
+                value={`${latestReadings.systolic}/${latestReadings.diastolic}`}
+                unit="mmHg"
+                status={bpStatus}
+                icon="💉"
+                animate
+              />
+            </Link>
+            <Link href="/conditions/hypertension" className="block hover:scale-[1.01] transition-transform">
+              <VitalCard
+                label="Heart Rate"
+                value={String(latestReadings.heartRate)}
+                unit="bpm"
+                status={hrStatus}
+                icon="❤️"
+                animate
+              />
+            </Link>
+            <Link href="/conditions/copd" className="block hover:scale-[1.01] transition-transform">
+              <VitalCard
+                label="SpO₂"
+                value={String(latestReadings.spo2)}
+                unit="%"
+                status={spo2Status}
+                icon="💨"
+                sublabel="Blood oxygen"
+                animate
+              />
+            </Link>
             <VitalCard
               label="Weight"
               value={String(latestReadings.weight)}
@@ -327,14 +351,16 @@ export default function DashboardPage() {
               status="green"
               icon="⚖️"
             />
-            <VitalCard
-              label="Streak"
-              value={String(streakDays)}
-              unit="days"
-              status="green"
-              icon="🔥"
-              sublabel="Adherence"
-            />
+            <Link href="/calendar" className="block hover:scale-[1.01] transition-transform">
+              <VitalCard
+                label="Streak"
+                value={String(streakDays)}
+                unit="days"
+                status="green"
+                icon="🔥"
+                sublabel="Adherence"
+              />
+            </Link>
           </div>
         </section>
 
@@ -344,9 +370,9 @@ export default function DashboardPage() {
             <h2 id="conditions-heading" className="font-semibold text-title-md text-text-primary">
               My Conditions
             </h2>
-            <button className="text-label-sm font-semibold text-accent-violet hover:text-accent-lavender transition-colors">
+            <Link href="/conditions" className="text-label-sm font-semibold text-accent-violet hover:text-accent-lavender transition-colors">
               View all →
-            </button>
+            </Link>
           </div>
           <div
             className="grid gap-3"
@@ -399,7 +425,7 @@ export default function DashboardPage() {
           <h2 id="reminders-heading" className="font-semibold text-title-md text-text-primary mb-3">
             Upcoming Doses
           </h2>
-          <UpcomingRemindersStrip doses={MOCK_UPCOMING_DOSES} />
+          <UpcomingRemindersStrip doses={upcomingDoses} onMarkTaken={markUpcomingDoseTaken} />
         </section>
 
         {/* ── Weekly summary ────────────────────────────────────────────────── */}

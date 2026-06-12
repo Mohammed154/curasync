@@ -38,3 +38,6 @@ coverage/
 # Editor
 .vscode/settings.json
 .idea/
+
+.vercel
+.env*

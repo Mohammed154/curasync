@@ -44,21 +44,35 @@ const GRAD_TEXT: React.CSSProperties = {
   backgroundClip: "text",
 };
 
+type Modal = "privacy" | "terms";
+
 export default function HomePage() {
   const [scrolled, setScrolled] = useState(false);
   const [activeCond, setActiveCond] = useState(0);
   const [loading, setLoading] = useState(true);
   const [mounted, setMounted] = useState(true);
-  const [activeModal, setActiveModal] = useState<"privacy" | "terms" | null>(null);
+  const [activeModal, setActiveModal] = useState<Modal | null>(null);
 
   useEffect(() => {
+    let mountTimer: ReturnType<typeof setTimeout> | null = null;
     const timer = setTimeout(() => {
       setLoading(false);
-      const mountTimer = setTimeout(() => setMounted(false), 800);
-      return () => clearTimeout(mountTimer);
+      mountTimer = setTimeout(() => setMounted(false), 800);
     }, 2200);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      if (mountTimer) clearTimeout(mountTimer);
+    };
   }, []);
+
+  useEffect(() => {
+    if (!activeModal) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setActiveModal(null);
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [activeModal]);
 
   useEffect(() => {
     const fn = () => setScrolled(window.scrollY > 20);
@@ -444,10 +458,13 @@ export default function HomePage() {
             Not a substitute for professional medical advice. Always consult your doctor.
           </p>
           <div style={{ display: "flex", gap: 20 }}>
-            {["Privacy","Terms"].map(l => (
+            {([
+              { label: "Privacy", value: "privacy" },
+              { label: "Terms", value: "terms" }
+            ] as const).map(item => (
               <button
-                key={l}
-                onClick={() => setActiveModal(l.toLowerCase() as any)}
+                key={item.value}
+                onClick={() => setActiveModal(item.value)}
                 style={{
                   background: "none",
                   border: "none",
@@ -460,7 +477,7 @@ export default function HomePage() {
                 onMouseEnter={e => e.currentTarget.style.color = "rgba(255,255,255,0.6)"}
                 onMouseLeave={e => e.currentTarget.style.color = "rgba(255,255,255,0.25)"}
               >
-                {l}
+                {item.label}
               </button>
             ))}
           </div>
@@ -469,18 +486,22 @@ export default function HomePage() {
 
       {/* ── MODALS ───────────────────────────────────────────────────────── */}
       {activeModal && (
-        <div style={{
-          position: "fixed",
-          inset: 0,
-          zIndex: 9999,
-          background: "rgba(0,0,0,0.7)",
-          backdropFilter: "blur(8px)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: 20,
-          animation: "ccFadeIn 0.3s ease-out"
-        }} onClick={() => setActiveModal(null)}>
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="modal-title"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 9999,
+            background: "rgba(0,0,0,0.7)",
+            backdropFilter: "blur(8px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 20,
+            animation: "ccFadeIn 0.3s ease-out"
+          }} onClick={() => setActiveModal(null)}>
           <div style={{
             background: "#121212",
             border: "1px solid rgba(255,255,255,0.08)",
@@ -495,7 +516,7 @@ export default function HomePage() {
             animation: "ccSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)"
           }} onClick={e => e.stopPropagation()}>
             <div style={{ padding: "24px 24px 16px", borderBottom: "1px solid rgba(255,255,255,0.06)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <h3 style={{ fontSize: 18, fontWeight: 700, margin: 0, color: "#fff" }}>
+              <h3 id="modal-title" style={{ fontSize: 18, fontWeight: 700, margin: 0, color: "#fff" }}>
                 {activeModal === "privacy" ? "Privacy Policy" : "Terms of Service"}
               </h3>
               <button

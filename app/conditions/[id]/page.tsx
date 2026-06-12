@@ -26,6 +26,16 @@ const CONDITION_METRICS: Record<string, {
     ],
     chartLabel: "24-hour glucose trend",
   },
+  diabetes_t1: {
+    primary: { label: "Blood Glucose", value: "142", unit: "mg/dL", status: "amber" },
+    secondary: [
+      { label: "HbA1c", value: "7.2", unit: "%" },
+      { label: "Fasting (avg)", value: "125", unit: "mg/dL" },
+      { label: "Post-meal (avg)", value: "160", unit: "mg/dL" },
+      { label: "Time in Range", value: "68", unit: "%" },
+    ],
+    chartLabel: "24-hour glucose trend",
+  },
   hypertension: {
     primary: { label: "Blood Pressure", value: "138/88", unit: "mmHg", status: "amber" },
     secondary: [
@@ -45,6 +55,66 @@ const CONDITION_METRICS: Record<string, {
       { label: "Last lab", value: "Apr 10", unit: "" },
     ],
     chartLabel: "eGFR trend (6 months)",
+  },
+  copd: {
+    primary: { label: "Peak Flow", value: "380", unit: "L/min", status: "green" },
+    secondary: [
+      { label: "FEV1/FVC", value: "68", unit: "%" },
+      { label: "Oxygen Saturation", value: "95", unit: "%" },
+      { label: "Inhaler use", value: "1.2", unit: "/day" },
+      { label: "Last spirometry", value: "May 12", unit: "" },
+    ],
+    chartLabel: "7-day peak flow trend",
+  },
+  chf: {
+    primary: { label: "Heart Rate", value: "74", unit: "bpm", status: "green" },
+    secondary: [
+      { label: "Ejection Fraction", value: "45", unit: "%" },
+      { label: "Blood Pressure", value: "122/78", unit: "mmHg" },
+      { label: "Fluid retention", value: "0.2", unit: "kg" },
+      { label: "Last BNP lab", value: "Mar 15", unit: "" },
+    ],
+    chartLabel: "7-day heart rate trend",
+  },
+  cad: {
+    primary: { label: "Heart Rate", value: "74", unit: "bpm", status: "green" },
+    secondary: [
+      { label: "LDL Cholesterol", value: "78", unit: "mg/dL" },
+      { label: "Blood Pressure", value: "118/74", unit: "mmHg" },
+      { label: "Readings this week", value: "10", unit: "" },
+      { label: "Last EKG", value: "Jan 20", unit: "" },
+    ],
+    chartLabel: "7-day heart rate trend",
+  },
+  hypothyroidism: {
+    primary: { label: "TSH", value: "4.2", unit: "mIU/L", status: "green" },
+    secondary: [
+      { label: "Free T4", value: "1.2", unit: "ng/dL" },
+      { label: "Free T3", value: "3.1", unit: "pg/mL" },
+      { label: "Levothyroxine dose", value: "75", unit: "mcg" },
+      { label: "Last lab", value: "Mar 28", unit: "" },
+    ],
+    chartLabel: "TSH trend (6 months)",
+  },
+  ra: {
+    primary: { label: "DAS28 Score", value: "3.4", unit: "", status: "green" },
+    secondary: [
+      { label: "CRP", value: "4.8", unit: "mg/L" },
+      { label: "ESR", value: "18", unit: "mm/hr" },
+      { label: "Pain scale (avg)", value: "2.4", unit: "/10" },
+      { label: "Morning stiffness", value: "20", unit: "min" },
+    ],
+    chartLabel: "DAS28 score trend (6 months)",
+  },
+  asthma: {
+    primary: { label: "Peak Flow", value: "82", unit: "%", status: "green" },
+    secondary: [
+      { label: "Rescue inhaler use", value: "1", unit: "/week" },
+      { label: "Control test score", value: "22", unit: "/25" },
+      { label: "Trigger events", value: "0", unit: "this week" },
+      { label: "Last checkup", value: "May 05", unit: "" },
+    ],
+    chartLabel: "7-day peak flow trend",
   },
 };
 

@@ -5,7 +5,7 @@ import Link from "next/link";
 import Aurora from "@/components/ui/Aurora";
 import {
   Heart, Activity, Pill, MessageSquare, Brain,
-  Watch, Shield, ChevronRight, Star, CheckCircle2,
+  Watch, Shield, ChevronRight, CheckCircle2,
   ArrowRight, Zap, BarChart3, Bell,
 } from "lucide-react";
 import { clsx } from "clsx";
@@ -15,7 +15,7 @@ const FEATURES = [
   { icon: Brain,       title: "AI Doctor",               description: "Get instant, plain-language explanations of your readings and personalised questions to ask your care team.", color: "#6C5CE7", bg: "#F0EFF8" },
   { icon: Pill,        title: "Medication Management",   description: "Never miss a dose. Smart reminders, adherence tracking, and drug-condition conflict alerts built in.", color: "#E84393", bg: "#FFF0F7" },
   { icon: BarChart3,   title: "Glucose Tracker",         description: "Log fasting, pre-meal, post-meal and bedtime readings with context-aware status and trend charts.", color: "#F39C12", bg: "#FEF9E7" },
-  { icon: MessageSquare, title: "Secure Messaging",      description: "HIPAA-compliant direct messaging with your care team. Get clinical feedback without a visit.", color: "#00B894", bg: "#E8F8F5" },
+  { icon: MessageSquare, title: "Secure Messaging",      description: "Secure direct messaging with your care team. Get clinical feedback without a visit.", color: "#00B894", bg: "#E8F8F5" },
   { icon: Watch,       title: "Wearable Sync",           description: "Automatic sync with Apple Watch, Fitbit, and Garmin. Data flows in — you focus on getting better.", color: "#A29BFE", bg: "#F0EFF8" },
 ];
 
@@ -31,17 +31,10 @@ const CONDITIONS = [
   { emoji: "🫀", label: "Coronary Artery Disease" },
 ];
 
-const TESTIMONIALS = [
-  { name: "Arjun Mehta",    role: "Type 2 Diabetes · Mumbai",                     avatar: "AM", quote: "CuraSync helped me understand my glucose patterns in a way my reports never could. My HbA1c dropped from 8.2 to 7.1 in four months.", rating: 5 },
-  { name: "Dr. Priya Sharma", role: "Internal Medicine · Mumbai Central Hospital", avatar: "PS", quote: "I can now monitor 40+ patients remotely and intervene before a crisis. The alert system is exactly what chronic care needed.", rating: 5 },
-  { name: "Meena Joshi",    role: "Type 1 Diabetes + Thyroid · Pune",             avatar: "MJ", quote: "Managing two conditions was overwhelming. CuraSync gives me one clear view — my medications, readings, and doctor in one place.", rating: 5 },
-];
-
 const STATS = [
   { value: "10+",    label: "Chronic conditions supported" },
   { value: "87%",    label: "Average medication adherence" },
   { value: "< 2s",   label: "Alert delivery time"          },
-  { value: "HIPAA",  label: "Compliant + DPDP Act 2023"    },
 ];
 
 const GRAD_TEXT: React.CSSProperties = {
@@ -51,9 +44,35 @@ const GRAD_TEXT: React.CSSProperties = {
   backgroundClip: "text",
 };
 
+type Modal = "privacy" | "terms";
+
 export default function HomePage() {
   const [scrolled, setScrolled] = useState(false);
   const [activeCond, setActiveCond] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [mounted, setMounted] = useState(true);
+  const [activeModal, setActiveModal] = useState<Modal | null>(null);
+
+  useEffect(() => {
+    let mountTimer: ReturnType<typeof setTimeout> | null = null;
+    const timer = setTimeout(() => {
+      setLoading(false);
+      mountTimer = setTimeout(() => setMounted(false), 800);
+    }, 2200);
+    return () => {
+      clearTimeout(timer);
+      if (mountTimer) clearTimeout(mountTimer);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!activeModal) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setActiveModal(null);
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [activeModal]);
 
   useEffect(() => {
     const fn = () => setScrolled(window.scrollY > 20);
@@ -68,6 +87,134 @@ export default function HomePage() {
 
   return (
     <div style={{ background: "#0A0A0A", color: "#fff", overflowX: "hidden", minHeight: "100vh" }}>
+      <style>{`
+        @keyframes curasyncPulse {
+          0%, 100% { transform: scale(1); opacity: 1; }
+          50% { transform: scale(1.03); opacity: 0.95; }
+        }
+        @keyframes ccFadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes ccSlideUp {
+          from { opacity: 0; transform: translateY(14px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
+
+      {mounted && (
+        <div style={{
+          position: "fixed",
+          inset: 0,
+          zIndex: 9999,
+          background: "#0A0A0A",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          transition: "all 0.8s cubic-bezier(0.16, 1, 0.3, 1)",
+          opacity: loading ? 1 : 0,
+          pointerEvents: loading ? "all" : "none",
+          transform: loading ? "scale(1)" : "scale(1.05)",
+        }}>
+          <div style={{
+            position: "absolute",
+            width: "600px",
+            height: "600px",
+            background: "radial-gradient(circle, rgba(108,92,231,0.15) 0%, rgba(0,0,0,0) 70%)",
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            pointerEvents: "none"
+          }} />
+
+          <div style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 16,
+            animation: "curasyncPulse 2s ease-in-out infinite",
+          }}>
+            <div className="gradient-violet" style={{
+              width: 64,
+              height: 64,
+              borderRadius: 16,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              boxShadow: "0 0 40px rgba(108,92,231,0.4)",
+            }}>
+              <Heart size={32} color="#fff" strokeWidth={2.5} />
+            </div>
+            <h1 style={{
+              fontSize: 28,
+              fontWeight: 800,
+              letterSpacing: "0.05em",
+              color: "#fff",
+              margin: 0
+            }}>
+              CuraSync
+            </h1>
+            <div style={{
+              width: 120,
+              height: 3,
+              background: "linear-gradient(90deg, #6C5CE7, #00CEC9)",
+              borderRadius: 2,
+              marginTop: 4
+            }} />
+          </div>
+
+          <div style={{
+            position: "absolute",
+            bottom: 48,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 8,
+            color: "rgba(255, 255, 255, 0.4)",
+            fontSize: 13,
+            fontWeight: 500,
+          }}>
+            <span>Created by</span>
+            <a
+              href="https://github.com/Mohammed154"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                color: "#fff",
+                textDecoration: "none",
+                fontWeight: 600,
+                background: "rgba(255, 255, 255, 0.05)",
+                border: "1px solid rgba(255, 255, 255, 0.1)",
+                padding: "8px 16px",
+                borderRadius: 99,
+                transition: "all 0.3s ease",
+                boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "rgba(255, 255, 255, 0.1)";
+                e.currentTarget.style.borderColor = "rgba(108, 92, 231, 0.5)";
+                e.currentTarget.style.boxShadow = "0 4px 20px rgba(108, 92, 231, 0.25)";
+                e.currentTarget.style.transform = "translateY(-2px)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "rgba(255, 255, 255, 0.05)";
+                e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.1)";
+                e.currentTarget.style.boxShadow = "0 4px 12px rgba(0, 0, 0, 0.1)";
+                e.currentTarget.style.transform = "translateY(0)";
+              }}
+            >
+              <svg height="16" width="16" viewBox="0 0 16 16" fill="currentColor" style={{ flexShrink: 0 }}>
+                <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" />
+              </svg>
+              <span>Mohammed Songadhwala</span>
+            </a>
+          </div>
+        </div>
+      )}
 
       {/* ── NAV ─────────────────────────────────────────────────────────── */}
       <nav style={{
@@ -108,8 +255,8 @@ export default function HomePage() {
         <div style={{ position: "relative", zIndex: 10, maxWidth: 820, margin: "0 auto" }}>
           {/* Badge */}
           <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 14px", borderRadius: 99, background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", marginBottom: 24, backdropFilter: "blur(8px)" }}>
-            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#00B894", display: "inline-block", animation: "pulse 2s infinite" }} />
-            <span style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.8)", letterSpacing: "0.08em", textTransform: "uppercase" }}>HIPAA Compliant · DPDP Act 2023</span>
+            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#00B894", display: "inline-block" }} />
+            <span style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.8)", letterSpacing: "0.08em", textTransform: "uppercase" }}>Unified Chronic Care Platform</span>
           </div>
 
           {/* Headline */}
@@ -220,7 +367,7 @@ export default function HomePage() {
               The provider dashboard gives you a live panel sorted by alert severity, adherence, and last activity. Customise thresholds per patient and message them directly.
             </p>
             <ul style={{ listStyle: "none", padding: 0, margin: "0 0 28px", display: "flex", flexDirection: "column", gap: 10 }}>
-              {["Real-time patient vitals panel","Per-patient alert threshold customisation","7-day adherence from actual dose logs","HIPAA-compliant patient messaging","One-click clinical PDF export","Symptom frequency heatmaps"].map(item => (
+              {["Real-time patient vitals panel","Per-patient alert threshold customisation","7-day adherence from actual dose logs","Secure patient messaging","One-click clinical PDF export","Symptom frequency heatmaps"].map(item => (
                 <li key={item} style={{ display: "flex", alignItems: "flex-start", gap: 10, fontSize: 14, color: "rgba(255,255,255,0.65)" }}>
                   <CheckCircle2 size={15} color="#00CEC9" style={{ flexShrink: 0, marginTop: 2 }} />
                   {item}
@@ -265,38 +412,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── TESTIMONIALS ─────────────────────────────────────────────────── */}
-      <section style={{ padding: "96px 20px", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
-        <div style={{ maxWidth: 1000, margin: "0 auto" }}>
-          <div style={{ textAlign: "center", marginBottom: 52 }}>
-            <p style={{ fontSize: 11, fontWeight: 600, color: "#E84393", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 12 }}>Real stories</p>
-            <h2 style={{ fontWeight: 800, color: "#fff", fontSize: "clamp(1.8rem,4vw,2.4rem)" }}>Trusted by patients and doctors</h2>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 16 }}>
-            {TESTIMONIALS.map(t => (
-              <div key={t.name} style={{ borderRadius: 20, padding: 24, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.03)", display: "flex", flexDirection: "column" }}>
-                <div style={{ display: "flex", gap: 3, marginBottom: 16 }}>
-                  {Array.from({ length: t.rating }).map((_, i) => (
-                    <Star key={i} size={13} color="#FBBF24" fill="#FBBF24" />
-                  ))}
-                </div>
-                <p style={{ color: "rgba(255,255,255,0.65)", fontSize: 13, lineHeight: 1.75, flex: 1, marginBottom: 20 }}>
-                  &ldquo;{t.quote}&rdquo;
-                </p>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <div style={{ width: 36, height: 36, borderRadius: "50%", background: "linear-gradient(135deg,#6C5CE7,#E84393)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 700, fontSize: 11, flexShrink: 0 }}>
-                    {t.avatar}
-                  </div>
-                  <div>
-                    <p style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>{t.name}</p>
-                    <p style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>{t.role}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+      {/* Testimonials removed */}
 
       {/* ── FINAL CTA ────────────────────────────────────────────────────── */}
       <section style={{ padding: "96px 20px", position: "relative", overflow: "hidden" }}>
@@ -321,7 +437,7 @@ export default function HomePage() {
             </Link>
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 20, fontSize: 12, color: "rgba(255,255,255,0.3)" }}>
-            {["🔒 HIPAA Compliant","🇮🇳 DPDP Act 2023","🏥 10+ Conditions","⌚ Apple Watch · Fitbit · Garmin"].map(t => (
+            {["🛡️ Secure & Encrypted","🏥 10+ Conditions","⌚ Apple Watch · Fitbit · Garmin"].map(t => (
               <span key={t}>{t}</span>
             ))}
           </div>
@@ -342,12 +458,122 @@ export default function HomePage() {
             Not a substitute for professional medical advice. Always consult your doctor.
           </p>
           <div style={{ display: "flex", gap: 20 }}>
-            {["Privacy","Terms","HIPAA"].map(l => (
-              <a key={l} href="#" style={{ color: "rgba(255,255,255,0.25)", fontSize: 12, textDecoration: "none" }}>{l}</a>
+            {([
+              { label: "Privacy", value: "privacy" },
+              { label: "Terms", value: "terms" }
+            ] as const).map(item => (
+              <button
+                key={item.value}
+                onClick={() => setActiveModal(item.value)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  padding: 0,
+                  cursor: "pointer",
+                  color: "rgba(255,255,255,0.25)",
+                  fontSize: 12,
+                  transition: "color 0.2s"
+                }}
+                onMouseEnter={e => e.currentTarget.style.color = "rgba(255,255,255,0.6)"}
+                onMouseLeave={e => e.currentTarget.style.color = "rgba(255,255,255,0.25)"}
+              >
+                {item.label}
+              </button>
             ))}
           </div>
         </div>
       </footer>
+
+      {/* ── MODALS ───────────────────────────────────────────────────────── */}
+      {activeModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="modal-title"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 9999,
+            background: "rgba(0,0,0,0.7)",
+            backdropFilter: "blur(8px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 20,
+            animation: "ccFadeIn 0.3s ease-out"
+          }} onClick={() => setActiveModal(null)}>
+          <div style={{
+            background: "#121212",
+            border: "1px solid rgba(255,255,255,0.08)",
+            borderRadius: 24,
+            width: "100%",
+            maxWidth: 560,
+            maxHeight: "80vh",
+            display: "flex",
+            flexDirection: "column",
+            position: "relative",
+            boxShadow: "0 20px 40px rgba(0,0,0,0.5)",
+            animation: "ccSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)"
+          }} onClick={e => e.stopPropagation()}>
+            <div style={{ padding: "24px 24px 16px", borderBottom: "1px solid rgba(255,255,255,0.06)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <h3 id="modal-title" style={{ fontSize: 18, fontWeight: 700, margin: 0, color: "#fff" }}>
+                {activeModal === "privacy" ? "Privacy Policy" : "Terms of Service"}
+              </h3>
+              <button
+                onClick={() => setActiveModal(null)}
+                style={{ background: "rgba(255,255,255,0.05)", border: "none", color: "#fff", cursor: "pointer", width: 32, height: 32, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", transition: "background 0.2s" }}
+                onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.1)"}
+                onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,0.05)"}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ padding: 24, overflowY: "auto", fontSize: 14, color: "rgba(255,255,255,0.65)", lineHeight: 1.6, flex: 1 }}>
+              {activeModal === "privacy" ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                  <div>
+                    <h4 style={{ color: "#fff", fontWeight: 600, marginBottom: 6 }}>1. Information We Collect</h4>
+                    <p style={{ margin: 0 }}>We collect health metrics (such as blood glucose, blood pressure, heart rate), medication logs, and device data synced from Apple Watch, Fitbit, or Garmin, solely to display them on your dashboard.</p>
+                  </div>
+                  <div>
+                    <h4 style={{ color: "#fff", fontWeight: 600, marginBottom: 6 }}>2. Data Security & Storage</h4>
+                    <p style={{ margin: 0 }}>All medical and personal data is encrypted in transit and at rest. Access control mechanisms ensure only you and your authorized care providers can view your data.</p>
+                  </div>
+                  <div>
+                    <h4 style={{ color: "#fff", fontWeight: 600, marginBottom: 6 }}>3. Right to Erasure</h4>
+                    <p style={{ margin: 0 }}>You have complete control over your accounts. You can delete your profile and all associated medical readings at any time via the Settings page.</p>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                  <div>
+                    <h4 style={{ color: "#fff", fontWeight: 600, marginBottom: 6 }}>1. Informational Purposes Only</h4>
+                    <p style={{ margin: 0 }}>CuraSync is an educational and monitoring dashboard designed to assist patients in tracking chronic health metrics. It is NOT a substitute for professional medical advice, diagnosis, or treatment.</p>
+                  </div>
+                  <div>
+                    <h4 style={{ color: "#fff", fontWeight: 600, marginBottom: 6 }}>2. Not for Emergencies</h4>
+                    <p style={{ margin: 0 }}>CuraSync is not a crisis response system. In the event of a medical emergency, please contact your local emergency response services or visit the nearest hospital immediately.</p>
+                  </div>
+                  <div>
+                    <h4 style={{ color: "#fff", fontWeight: 600, marginBottom: 6 }}>3. Account Security</h4>
+                    <p style={{ margin: 0 }}>You are responsible for securing your login credentials and tracking access permissions granted to your care providers.</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div style={{ padding: 16, borderTop: "1px solid rgba(255,255,255,0.06)", display: "flex", justifyContent: "flex-end" }}>
+              <button
+                onClick={() => setActiveModal(null)}
+                style={{ background: "linear-gradient(135deg,#6C5CE7,#A29BFE)", border: "none", color: "#fff", fontWeight: 600, padding: "8px 20px", borderRadius: 99, cursor: "pointer" }}
+              >
+                Got it
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

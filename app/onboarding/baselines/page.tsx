@@ -119,9 +119,12 @@ export default function OnboardingBaselinesPage() {
           </Link>
         </div>
 
-        <button className="w-full text-center text-label-sm text-text-tertiary mt-3 hover:text-text-secondary transition-colors">
+        <Link
+          href="/onboarding/medications"
+          className="block w-full text-center text-label-sm text-text-tertiary mt-3 hover:text-text-secondary transition-colors"
+        >
           Skip — I&apos;ll add these later
-        </button>
+        </Link>
       </div>
     </div>
   );

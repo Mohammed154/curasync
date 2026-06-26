@@ -8,6 +8,7 @@ const isPublicRoute = createRouteMatcher([
   "/api/v1/sync(.*)",
   "/api/v1/onboarding(.*)",
   "/api/health",
+  "/api/v1/health(.*)",
 ]);
 
 const proxy = clerkMiddleware(async (auth, request) => {

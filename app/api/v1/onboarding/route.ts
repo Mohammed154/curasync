@@ -47,41 +47,49 @@ export async function POST(request: NextRequest) {
 
   const { name, dateOfBirth, conditions, emergencyContact } = parsed.data;
 
-  // Upsert: create new profile or update existing (idempotent)
-  const existing = await db
-    .select({ id: patientProfiles.id })
-    .from(patientProfiles)
-    .where(eq(patientProfiles.userId, session.userId))
-    .limit(1);
-
   let profile;
-  if (existing.length > 0 && existing[0]) {
-    // Update existing profile
-    const [updated] = await db
-      .update(patientProfiles)
-      .set({
-        name,
-        dateOfBirth,
-        conditions,
-        emergencyContact: emergencyContact ?? null,
-        updatedAt: new Date(),
-      })
+  let existing;
+  try {
+    existing = await db
+      .select({ id: patientProfiles.id })
+      .from(patientProfiles)
       .where(eq(patientProfiles.userId, session.userId))
-      .returning();
-    profile = updated;
-  } else {
-    // Create new profile
-    const [inserted] = await db
-      .insert(patientProfiles)
-      .values({
-        userId:           session.userId,
-        name,
-        dateOfBirth,
-        conditions,
-        emergencyContact: emergencyContact ?? null,
-      })
-      .returning();
-    profile = inserted;
+      .limit(1);
+
+    if (existing.length > 0 && existing[0]) {
+      // Update existing profile
+      const [updated] = await db
+        .update(patientProfiles)
+        .set({
+          name,
+          dateOfBirth,
+          conditions,
+          emergencyContact: emergencyContact ?? null,
+          updatedAt: new Date(),
+        })
+        .where(eq(patientProfiles.userId, session.userId))
+        .returning();
+      profile = updated;
+    } else {
+      // Create new profile
+      const [inserted] = await db
+        .insert(patientProfiles)
+        .values({
+          userId:           session.userId,
+          name,
+          dateOfBirth,
+          conditions,
+          emergencyContact: emergencyContact ?? null,
+        })
+        .returning();
+      profile = inserted;
+    }
+  } catch (dbErr: any) {
+    console.error("[onboarding] POST database error:", dbErr);
+    return NextResponse.json(
+      { error: "Database error during onboarding", code: "DATABASE_ERROR", details: dbErr.message, requestId },
+      { status: 500 }
+    );
   }
 
   void writeAuditLog({
@@ -106,11 +114,21 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized", code: "NOT_AUTHENTICATED", requestId }, { status: 401 });
   }
 
-  const [profile] = await db
-    .select()
-    .from(patientProfiles)
-    .where(eq(patientProfiles.userId, session.userId))
-    .limit(1);
+  let profile;
+  try {
+    const rows = await db
+      .select()
+      .from(patientProfiles)
+      .where(eq(patientProfiles.userId, session.userId))
+      .limit(1);
+    profile = rows[0];
+  } catch (dbErr: any) {
+    console.error("[onboarding] GET database error:", dbErr);
+    return NextResponse.json(
+      { error: "Database error retrieving profile", code: "DATABASE_ERROR", details: dbErr.message, requestId },
+      { status: 500 }
+    );
+  }
 
   if (!profile) {
     return NextResponse.json({ data: null, onboardingComplete: false, requestId, timestamp: new Date().toISOString() }, { status: 200 });

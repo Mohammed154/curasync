@@ -11,7 +11,7 @@ const isPublicRoute = createRouteMatcher([
   "/api/v1/health(.*)",
 ]);
 
-const proxy = clerkMiddleware(async (auth, request) => {
+const middleware = clerkMiddleware(async (auth, request) => {
   if (isPublicRoute(request)) return;
 
   const key = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ?? "";
@@ -22,7 +22,7 @@ const proxy = clerkMiddleware(async (auth, request) => {
   await auth.protect();
 });
 
-export default proxy;
+export default middleware;
 
 export const config = {
   matcher: [

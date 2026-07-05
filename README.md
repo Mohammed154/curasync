@@ -52,7 +52,7 @@ Open [http://localhost:3000](http://localhost:3000) → auto-redirects to `/dash
 | `/alerts` | Alert history + DND scheduler |
 | `/messages` | Secure patient-provider messaging |
 | `/wearables` | Device management — Apple Watch, Fitbit, Garmin, BLE |
-| `/ai-doctor` | AI Doctor chat (Claude Sonnet via server-side proxy) |
+| `/ai-doctor` | AI Doctor chat (Gemini Flash via server-side proxy) |
 | `/settings` | Profile, notifications, privacy, data export |
 | `/onboarding` | 5-step patient onboarding (saves to Supabase) |
 | `/pdf-preview` | Server-rendered clinical report for Puppeteer PDF capture |

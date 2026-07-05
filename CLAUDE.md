@@ -36,7 +36,7 @@
 curasync/
 ├── app/
 │   ├── api/v1/
-│   │   ├── ai/route.ts          ← Claude proxy (keeps API key server-side)
+│   │   ├── ai/route.ts          ← Gemini proxy (keeps API key server-side)
 │   │   ├── alerts/route.ts      ← GET alerts, PATCH acknowledge/dismiss
 │   │   ├── export/route.ts      ← PDF export (5/day rate limit)
 │   │   ├── journal/route.ts     ← CRUD + 5/day limit + 2-day edit window
@@ -47,7 +47,7 @@ curasync/
 │   │   ├── patients/route.ts    ← Provider panel + real adherence score
 │   │   ├── readings/route.ts    ← Biometric ingestion + alert evaluation
 │   │   └── sync/route.ts        ← Wearable webhook (HMAC-verified)
-│   ├── ai-doctor/               ← Full dark Claude streaming chat
+│   ├── ai-doctor/               ← Full dark Gemini streaming chat
 │   ├── alerts/                  ← Alert history + DND scheduler
 │   ├── calendar/                ← 365-day range selector + stats
 │   ├── conditions/[id]/         ← Per-condition detail + reference ranges

@@ -170,7 +170,7 @@ export default function DashboardPage() {
               </p>
               <div className="flex items-center gap-1.5 mt-3 text-accent-lavender text-xs font-semibold">
                 <Sparkles size={12} aria-hidden="true" />
-                Powered by Claude · Not medical advice
+                Powered by Gemini · Not medical advice
               </div>
             </div>
             {/* Orb */}

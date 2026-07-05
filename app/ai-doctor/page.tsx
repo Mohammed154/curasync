@@ -36,7 +36,7 @@ STRICT RULES:
 - Do not store or reference any conversation history beyond this session.`;
 
 const SUGGESTED_PROMPTS = [
-  "What does my blood glucose of 142 mg/dL mean?",
+  "Daily health tips for a smooth lifestyle with chronic diseases",
   "Why is my blood pressure reading concerning?",
   "What questions should I ask my doctor about my CKD?",
   "Explain my medications and what they do",
@@ -99,7 +99,7 @@ export default function AiDoctorPage() {
         signal: abortRef.current.signal,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
+          model: "gemini-2.5-flash",
           max_tokens: 1000,
           system: SYSTEM_PROMPT,
           stream: true,
@@ -181,18 +181,18 @@ export default function AiDoctorPage() {
         </div>
         <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/10">
           <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" aria-hidden="true" />
-          <span className="text-xs font-medium text-white/70">Claude</span>
+          <span className="text-xs font-medium text-white/70">Gemini</span>
         </div>
       </div>
 
       {/* ── Hero / Empty state ──────────────────────────────────────────── */}
       {messages.length === 0 && (
-        <div className="flex-1 flex flex-col items-center justify-center px-6 pb-8">
+        <div className="flex-1 flex flex-col items-center justify-start overflow-y-auto px-6 pt-4 pb-8">
           {/* Orb */}
           <div
-            className="relative mb-8"
+            className="relative mb-4 flex-shrink-0"
             aria-hidden="true"
-            style={{ width: 200, height: 200 }}
+            style={{ width: 140, height: 140 }}
           >
             {/* Outer glow */}
             <div
@@ -204,7 +204,7 @@ export default function AiDoctorPage() {
             />
             {/* Main orb */}
             <div
-              className="absolute inset-6 rounded-full"
+              className="absolute inset-4 rounded-full"
               style={{
                 background: "conic-gradient(from 0deg, #1a1a2e, #6c5ce7, #a29bfe, #e84393, #00cec9, #1a1a2e)",
                 animation: "orbSpin 12s linear infinite",
@@ -213,28 +213,28 @@ export default function AiDoctorPage() {
             />
             {/* Inner shine */}
             <div
-              className="absolute inset-8 rounded-full"
+              className="absolute inset-5 rounded-full"
               style={{
                 background: "radial-gradient(circle at 35% 35%, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0.05) 50%, transparent 70%)",
               }}
             />
             {/* Center */}
             <div
-              className="absolute inset-10 rounded-full"
+              className="absolute inset-6 rounded-full"
               style={{ background: "rgba(10,10,10,0.6)", backdropFilter: "blur(8px)" }}
             />
           </div>
 
-          <h1 className="text-white font-bold text-3xl text-center mb-2 leading-tight">
+          <h1 className="text-white font-bold text-3xl text-center mb-1 leading-tight">
             Hey, Arjun 👋<br />
             <span className="text-white/70 font-normal text-xl">How can I help you?</span>
           </h1>
-          <p className="text-white/40 text-sm text-center max-w-xs mb-8">
+          <p className="text-white/40 text-sm text-center max-w-xs mb-3">
             Ask me about your readings, conditions, medications, or what to discuss with your doctor.
           </p>
 
           {/* Safety disclaimer */}
-          <div className="flex items-start gap-2 px-4 py-3 rounded-xl bg-white/5 border border-white/10 mb-6 max-w-sm">
+          <div className="flex items-start gap-2 px-4 py-3 rounded-xl bg-white/5 border border-white/10 mb-4 max-w-sm">
             <AlertTriangle size={14} className="text-yellow-400 flex-shrink-0 mt-0.5" aria-hidden="true" />
             <p className="text-white/50 text-xs leading-relaxed">
               I provide health information only — not medical advice, diagnosis, or prescriptions. Always consult your doctor for medical decisions.

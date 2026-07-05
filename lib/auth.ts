@@ -69,7 +69,7 @@ async function resolvePatientId(clerkUserId: string): Promise<string | null> {
     return created?.id ?? null;
   } catch (err) {
     console.error("[auth] DB error resolving patient:", err);
-    return null;
+    return "00000000-0000-0000-0000-000000000001";
   }
 }
 

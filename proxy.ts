@@ -1,5 +1,5 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 const isPublicRoute = createRouteMatcher([
   "/",
@@ -12,18 +12,32 @@ const isPublicRoute = createRouteMatcher([
   "/api/v1/health(.*)",
 ]);
 
-const proxy = clerkMiddleware(async (auth, request) => {
-  try {
-    if (isPublicRoute(request)) return;
+// Initialize Clerk middleware handler
+const clerk = clerkMiddleware(async (auth, request) => {
+  if (isPublicRoute(request)) return;
 
+  // Protect all non-public routes
+  await auth.protect();
+});
+
+/**
+ * Top-level Middleware Wrapper
+ * Intercepts calls to Clerk and ensures it is fully configured before execution.
+ * Gracefully handles unhandled exceptions to prevent hard 500 crashes.
+ */
+export default async function proxy(request: NextRequest, event: any) {
+  try {
     const key = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ?? "";
     const configured = (key.startsWith("pk_live_") || key.startsWith("pk_test_")) && key.length > 30;
 
-    if (!configured) return;
+    // Gracefully bypass if Clerk is not configured (e.g. preview deployments or local offline dev)
+    if (!configured) {
+      return NextResponse.next();
+    }
 
-    await auth.protect();
+    return await clerk(request, event);
   } catch (error) {
-    // Retain standard Clerk/Next.js redirect errors so authorization flows work correctly
+    // Rethrow Next.js redirect errors so normal auth redirects work
     const err = error as any;
     if (
       err &&
@@ -34,12 +48,10 @@ const proxy = clerkMiddleware(async (auth, request) => {
       throw error;
     }
 
-    console.error("[proxy] Unhandled error during proxy execution:", error);
+    console.error("[proxy] Edge middleware unhandled exception:", error);
     return NextResponse.next();
   }
-});
-
-export default proxy;
+}
 
 export const config = {
   matcher: [

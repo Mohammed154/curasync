@@ -1,7 +1,7 @@
 // app/api/v1/ai/route.ts
 // Server-side proxy for the AI Doctor feature.
-// Keeps ANTHROPIC_API_KEY on the server — never exposed to the browser.
-// Streams the Claude response back to the client as SSE.
+// Keeps GEMINI_API_KEY on the server — never exposed to the browser.
+// Streams the Gemini response back to the client as SSE (formatted to match expected schema).
 
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Validation failed", code: "INVALID_PAYLOAD", requestId }, { status: 400 });
   }
 
-  if (!process.env.ANTHROPIC_API_KEY) {
+  if (!process.env.GEMINI_API_KEY) {
     return NextResponse.json(
       { error: "AI service not configured", code: "SERVICE_UNAVAILABLE", requestId },
       { status: 503 }
@@ -92,32 +92,97 @@ export async function POST(request: NextRequest) {
   const patientContext = await buildPatientContext(authCtx.patientId);
   const systemPrompt = `${SYSTEM_PROMPT_BASE}\n\nPATIENT CONTEXT:\n${patientContext}`;
 
-  // Stream from Anthropic
-  const anthropicRes = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type":         "application/json",
-      "x-api-key":            process.env.ANTHROPIC_API_KEY,
-      "anthropic-version":    "2023-06-01",
-      "anthropic-beta":       "messages-2023-12-15",
-    },
-    body: JSON.stringify({
-      model:      "claude-sonnet-4-20250514",
-      max_tokens: 1000,
-      system:     systemPrompt,
-      stream:     true,
-      messages:   parsed.data.messages,
-    }),
-  });
+  // Map incoming messages to Gemini structure (roles are user/model)
+  const geminiMessages = parsed.data.messages.map((m) => ({
+    role: m.role === "assistant" ? "model" : "user",
+    parts: [{ text: m.content }],
+  }));
 
-  if (!anthropicRes.ok) {
-    const errText = await anthropicRes.text();
-    console.error("[ai] Anthropic error:", errText);
+  // Stream from Gemini API using alt=sse for standard EventSource format
+  const geminiRes = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?key=${process.env.GEMINI_API_KEY}&alt=sse`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        contents: geminiMessages,
+        systemInstruction: {
+          parts: [{ text: systemPrompt }],
+        },
+        generationConfig: {
+          maxOutputTokens: 1000,
+        },
+      }),
+    }
+  );
+
+  if (!geminiRes.ok) {
+    const errText = await geminiRes.text();
+    console.error("[ai] Gemini API error:", errText);
     return NextResponse.json({ error: "AI service error", code: "AI_ERROR", requestId }, { status: 502 });
   }
 
-  // Pipe the SSE stream directly to the client
-  return new NextResponse(anthropicRes.body, {
+  if (!geminiRes.body) {
+    console.error("[ai] Gemini response body is null");
+    return NextResponse.json({ error: "AI service response body error", code: "AI_ERROR", requestId }, { status: 502 });
+  }
+
+  const encoder = new TextEncoder();
+  const decoder = new TextDecoder();
+
+  // Create a transform stream to format Gemini's chunk output into expected Anthropic client format
+  const transformStream = new ReadableStream({
+    async start(controller) {
+      const reader = geminiRes.body!.getReader();
+      let buffer = "";
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed) continue;
+
+            if (trimmed.startsWith("data: ")) {
+              const dataStr = trimmed.slice(6);
+              try {
+                const parsedChunk = JSON.parse(dataStr);
+                const text = parsedChunk.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (text) {
+                  const clientEvent = {
+                    type: "content_block_delta",
+                    delta: {
+                      type: "text_delta",
+                      text: text,
+                    },
+                  };
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify(clientEvent)}\n\n`));
+                }
+              } catch (e) {
+                // Ignore parse errors from partial / control events in the stream
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.error("[ai] Transform stream error:", err);
+        controller.error(err);
+      } finally {
+        controller.close();
+      }
+    },
+  });
+
+  // Pipe the translated stream to the client
+  return new NextResponse(transformStream, {
     status: 200,
     headers: {
       "Content-Type":      "text/event-stream",

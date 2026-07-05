@@ -20,7 +20,7 @@ const ENV_SPECS: EnvSpec[] = [
   { key: "NEXT_PUBLIC_SUPABASE_ANON_KEY",      required: "production",  description: "Supabase anon public key" },
 
   // Optional (feature-gated)
-  { key: "ANTHROPIC_API_KEY",                  required: "optional",    description: "Anthropic API key (AI Doctor feature)" },
+  { key: "GEMINI_API_KEY",                     required: "optional",    description: "Gemini API key (AI Doctor feature)" },
   { key: "RESEND_API_KEY",                     required: "optional",    description: "Resend API key (email)" },
   { key: "TWILIO_ACCOUNT_SID",                 required: "optional",    description: "Twilio SID (SMS alerts)" },
   { key: "TWILIO_AUTH_TOKEN",                  required: "optional",    description: "Twilio auth token" },

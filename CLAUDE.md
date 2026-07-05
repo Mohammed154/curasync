@@ -219,7 +219,7 @@ Minimum to make CI pass: `VERCEL_TOKEN`, `DATABASE_URL`, `NEXT_PUBLIC_CLERK_PUBL
 | SMS alerts | Twilio | Stub — call after `evaluateReading()` in readings route |
 | PDF generation | AWS Lambda + Puppeteer | Stub in export route — implement `invokePdfLambda()` |
 | OCR | Google Cloud Vision | ✅ Wired (needs GOOGLE_APPLICATION_CREDENTIALS_JSON) |
-| AI Doctor | Anthropic | ✅ Wired via `/api/v1/ai` proxy (needs ANTHROPIC_API_KEY) |
+| AI Doctor | Gemini | ✅ Wired via `/api/v1/ai` proxy (needs GEMINI_API_KEY) |
 | CI/CD | GitHub Actions + Vercel | ✅ `.github/workflows/` ready (needs secrets) |
 | Wearable OAuth | Fitbit/Garmin | Stub — implement OAuth callback routes |
 

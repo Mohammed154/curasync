@@ -172,7 +172,7 @@ POST /api/v1/readings
 | `CLERK_SECRET_KEY` | ✅ | Clerk |
 | `UPSTASH_REDIS_REST_URL` | Production | Upstash |
 | `UPSTASH_REDIS_REST_TOKEN` | Production | Upstash |
-| `ANTHROPIC_API_KEY` | AI Doctor | Anthropic |
+| `GEMINI_API_KEY` | AI Doctor | Gemini |
 | `RESEND_API_KEY` | Email | Resend |
 | `TWILIO_ACCOUNT_SID` | SMS | Twilio |
 | `TWILIO_AUTH_TOKEN` | SMS | Twilio |

@@ -7,8 +7,10 @@ export async function GET() {
     return NextResponse.json({ error: "DATABASE_URL not configured" }, { status: 500 });
   }
 
+  let sql: postgres.Sql | undefined;
+
   try {
-    const sql = postgres(url, { connect_timeout: 15, idle_timeout: 5 });
+    sql = postgres(url, { connect_timeout: 15, idle_timeout: 5 });
     const tablesResult = await sql`
       SELECT table_name 
       FROM information_schema.tables 
@@ -37,20 +39,29 @@ export async function GET() {
       patientProfilesColumns = colsResult;
     }
 
-    await sql.end();
+    console.log("[health] DB Connectivity check details:", {
+      tables,
+      readingsColumns,
+      patientProfilesColumns,
+    });
 
     return NextResponse.json({
       status: "connected",
       databaseHost: url.split("@")[1]?.split(":")[0] ?? "unknown",
-      tables,
-      readingsColumns,
-      patientProfilesColumns
     });
   } catch (error: any) {
+    console.error("[health] DB Connectivity check failed:", error);
     return NextResponse.json({
       status: "error",
-      message: error.message,
-      stack: error.stack
+      message: "Database connection failed",
     }, { status: 500 });
+  } finally {
+    if (sql) {
+      try {
+        await sql.end({ timeout: 5 });
+      } catch (endErr) {
+        console.error("[health] Error closing database connection:", endErr);
+      }
+    }
   }
 }

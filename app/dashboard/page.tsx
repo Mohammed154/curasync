@@ -64,33 +64,8 @@ export default function DashboardPage() {
 
   const handlePdfExport = useCallback(async () => {
     try {
-      const response = await fetch('/api/v1/export', {
-        credentials: 'include',
-      });
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('PDF export failed:', response.status, response.statusText, errorText);
-        throw new Error(`Failed to generate PDF: ${response.status} ${response.statusText}`);
-      }
-      const result = await response.json();
-      if (result.data.pdfUrl) {
-        // Check if it's a development mock URL
-        if (result.data.pdfUrl.includes('example.com/mock-pdf')) {
-          alert('PDF export is mocked in development mode. In production, this would generate and download a real PDF report.');
-          console.log('Mock PDF URL:', result.data.pdfUrl);
-          return;
-        }
-
-        // Download the PDF
-        const link = document.createElement('a');
-        link.href = result.data.pdfUrl;
-        link.download = `health-report-${result.data.patientName.replace(/\s+/g, '-').toLowerCase()}-${result.data.dateRange.start}-to-${result.data.dateRange.end}.pdf`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      } else {
-        alert('PDF generation failed. Please try again.');
-      }
+      const { generateCuraSyncMetricsPDF } = await import("@/lib/pdf");
+      await generateCuraSyncMetricsPDF();
     } catch (error) {
       console.error('PDF export error:', error);
       alert(`Failed to export PDF: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`);
@@ -388,26 +363,29 @@ export default function DashboardPage() {
           </div>
         </section>
 
-        {/* ── Chart + Adherence ─────────────────────────────────────────────── */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <div className="lg:col-span-2">
-            <GlucoseChart data={recentReadings} />
+        {/* ── Charts Viewport for PDF Export ──────────────────────────────── */}
+        <div id="curasync-charts-viewport" className="space-y-6 bg-transparent p-1">
+          {/* ── Chart + Adherence ─────────────────────────────────────────── */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="lg:col-span-2">
+              <GlucoseChart data={recentReadings} />
+            </div>
+            <div>
+              <AdherenceStreakCard
+                weeklyAdherence={weeklyAdherence}
+                streakDays={streakDays}
+              />
+            </div>
           </div>
-          <div>
-            <AdherenceStreakCard
-              weeklyAdherence={weeklyAdherence}
-              streakDays={streakDays}
-            />
-          </div>
-        </div>
 
-        {/* ── Glucose Daily Log (from Python glucose tracker) ──────────── */}
-        <section aria-labelledby="glucose-log-heading">
-          <h2 id="glucose-log-heading" className="font-semibold text-title-md text-text-primary mb-3">
-            🩸 Glucose Daily Log
-          </h2>
-          <GlucoseLogChart entries={getMockGlucoseLog()} />
-        </section>
+          {/* ── Glucose Daily Log (from Python glucose tracker) ────────── */}
+          <section aria-labelledby="glucose-log-heading">
+            <h2 id="glucose-log-heading" className="font-semibold text-title-md text-text-primary mb-3">
+              🩸 Glucose Daily Log
+            </h2>
+            <GlucoseLogChart entries={getMockGlucoseLog()} />
+          </section>
+        </div>
 
         {/* ── Medications ──────────────────────────────────────────────────── */}
         <section aria-labelledby="meds-heading">

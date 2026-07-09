@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useClerk } from "@clerk/nextjs";
 import {
   LayoutDashboard, Stethoscope, Pill, BookOpen, Bell,
   Settings, LogOut, Menu, X, Heart, ChevronDown, MapPin,
@@ -38,6 +39,61 @@ const PROVIDER_NAV: NavItem[] = [
   { label: "Alerts",         href: "/alerts",           icon: Bell },
   { label: "Settings",       href: "/settings",         icon: Settings },
 ];
+
+const CLERK_KEY = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ?? "";
+const CLERK_CONFIGURED = (CLERK_KEY.startsWith("pk_live_") || CLERK_KEY.startsWith("pk_test_")) && CLERK_KEY.length > 20;
+
+interface SafeSignOutButtonProps {
+  children: React.ReactNode;
+  onClick?: () => void;
+  className?: string;
+}
+
+export function SafeSignOutButton({
+  children,
+  onClick,
+  className
+}: SafeSignOutButtonProps) {
+  const router = useRouter();
+
+  if (CLERK_CONFIGURED) {
+    return (
+      <ClerkSignOutHelper onClick={onClick} className={className}>
+        {children}
+      </ClerkSignOutHelper>
+    );
+  }
+
+  const handleDemoSignOut = () => {
+    if (onClick) onClick();
+    router.push("/");
+  };
+
+  return (
+    <button onClick={handleDemoSignOut} className={className}>
+      {children}
+    </button>
+  );
+}
+
+// Inner helper that uses useClerk safely only when Clerk is active
+function ClerkSignOutHelper({
+  children,
+  onClick,
+  className
+}: SafeSignOutButtonProps) {
+  const { signOut } = useClerk();
+  const handleSignOut = async () => {
+    if (onClick) onClick();
+    await signOut({ redirectUrl: "/" });
+  };
+  return (
+    <button onClick={handleSignOut} className={className}>
+      {children}
+    </button>
+  );
+}
+
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -242,10 +298,10 @@ export default function AppShell({
             <Settings size={17} strokeWidth={2} className="text-text-tertiary" />
             Settings
           </Link>
-          <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-text-secondary hover:bg-status-red-bg hover:text-status-red transition-all text-label-sm font-medium">
+          <SafeSignOutButton className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-text-secondary hover:bg-status-red-bg hover:text-status-red transition-all text-label-sm font-medium">
             <LogOut size={17} strokeWidth={2} />
             Sign out
-          </button>
+          </SafeSignOutButton>
         </div>
       </aside>
 
@@ -449,16 +505,13 @@ export default function AppShell({
                     </div>
 
                     <div className="border-t border-divider p-1.5 bg-status-red-bg/10">
-                      <button
-                        onClick={() => {
-                          setProfileOpen(false);
-                          alert("Signing out... (Demo Mode)");
-                        }}
+                      <SafeSignOutButton
+                        onClick={closeProfile}
                         className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-status-red hover:bg-status-red-bg transition-all text-xs font-semibold"
                       >
                         <LogOut size={15} />
                         Sign out
-                      </button>
+                      </SafeSignOutButton>
                     </div>
                   </div>
                 )}

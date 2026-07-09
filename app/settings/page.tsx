@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import AppShell from "@/components/layout/AppShell";
+import AppShell, { SafeSignOutButton } from "@/components/layout/AppShell";
 import {
   User, Bell, Shield, Watch, Download, Trash2, ChevronRight,
   Moon, Globe, LogOut, Lock, FileText, Smartphone
@@ -257,10 +257,10 @@ export default function SettingsPage() {
         </div>
 
         {/* Sign out */}
-        <button className="w-full flex items-center justify-center gap-2 mt-5 py-3 rounded-xl border border-divider text-label-sm font-semibold text-text-secondary hover:bg-red-50 hover:text-status-red hover:border-status-red transition-all">
+        <SafeSignOutButton className="w-full flex items-center justify-center gap-2 mt-5 py-3 rounded-xl border border-divider text-label-sm font-semibold text-text-secondary hover:bg-red-50 hover:text-status-red hover:border-status-red transition-all">
           <LogOut size={16} aria-hidden="true" />
           Sign out
-        </button>
+        </SafeSignOutButton>
 
         <p className="text-center text-xs text-text-tertiary mt-4">
           CuraSync v0.1.0 · HIPAA Compliant · DPDP Act 2023

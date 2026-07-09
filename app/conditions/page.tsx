@@ -81,7 +81,7 @@ export default function ConditionsPage() {
       setMyConditionIds(initial);
       localStorage.setItem("tracked_conditions", JSON.stringify(initial));
     }
-  }, [patient.conditions]);
+  }, []);
 
   const addCondition = (id: ConditionId) => {
     if (!myConditionIds.includes(id)) {

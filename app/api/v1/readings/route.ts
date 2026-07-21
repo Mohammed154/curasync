@@ -183,6 +183,8 @@ export async function POST(request: NextRequest) {
   );
 }
 
+export const dynamic = "force-dynamic";
+
 export async function GET(request: NextRequest) {
   const requestId = nanoid(12);
 
@@ -196,7 +198,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const { searchParams } = new URL(request.url);
+  const searchParams = request.nextUrl.searchParams;
   const type       = searchParams.get("type");
   const limit      = Math.min(parseInt(searchParams.get("limit") ?? "100"), 1000);
   const rangeStart = searchParams.get("rangeStart");

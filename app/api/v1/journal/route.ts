@@ -103,12 +103,14 @@ export async function PATCH(request: NextRequest) {
   return NextResponse.json({ data: updated, requestId, timestamp: new Date().toISOString() }, { status: 200 });
 }
 
+export const dynamic = "force-dynamic";
+
 export async function GET(request: NextRequest) {
   const requestId = nanoid(12);
   const authCtx = await getPatientAuth(request);
   if (isNextResponse(authCtx)) return authCtx;
 
-  const { searchParams } = new URL(request.url);
+  const searchParams = request.nextUrl.searchParams;
   const conditionId = searchParams.get("conditionId");
   const limit = Math.min(parseInt(searchParams.get("limit") ?? "50"), 200);
   const patId = authCtx.patientId as `${string}-${string}-${string}-${string}-${string}`;

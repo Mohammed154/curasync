@@ -12,19 +12,24 @@ declare global {
 function createClient(): postgres.Sql {
   const url = process.env.DATABASE_URL;
 
-  if (!url || url.includes("placeholder")) {
+  let isValidUrl = false;
+  if (url && !url.includes("placeholder")) {
+    try {
+      new URL(url);
+      isValidUrl = true;
+    } catch {
+      isValidUrl = false;
+    }
+  }
+
+  if (!isValidUrl) {
     if (process.env.NODE_ENV === "production") {
-      // Avoid failing the build if DATABASE_URL is missing only during Next.js build phase
-      const isNextBuild = process.env.NEXT_PHASE === "phase-production-build";
-      if (isNextBuild) {
-        console.warn("[db] DATABASE_URL is not set during production build. Returning fallback client.");
-        return postgres("postgresql://localhost:5432/build_placeholder", {
-          max: 0,
-          connect_timeout: 1,
-          idle_timeout: 1,
-        });
-      }
-      throw new Error("DATABASE_URL is required in production.");
+      console.warn("[db] DATABASE_URL is missing or invalid. Returning fallback client.");
+      return postgres("postgresql://localhost:5432/build_placeholder", {
+        max: 0,
+        connect_timeout: 1,
+        idle_timeout: 1,
+      });
     }
     // Dev without DB — return a client that gives clear errors on query
     console.warn("[db] DATABASE_URL not set — DB queries will fail. Add it to .env.local");
@@ -35,7 +40,7 @@ function createClient(): postgres.Sql {
     });
   }
 
-  return postgres(url, {
+  return postgres(url!, {
     max:             10,
     idle_timeout:    20,
     connect_timeout: 10,

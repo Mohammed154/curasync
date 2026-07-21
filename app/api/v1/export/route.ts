@@ -61,12 +61,14 @@ async function generatePdfWithApi({ patientId, rangeStart, rangeEnd, patientName
   return data.FileUrl; // api2pdf returns the PDF URL
 }
 
+export const dynamic = "force-dynamic";
+
 export async function GET(request: NextRequest) {
   const requestId = nanoid(12);
 
   // In development, return mock data instead of hitting the database
   if (process.env.NEXT_PUBLIC_APP_ENV === 'development') {
-    const { searchParams } = new URL(request.url);
+    const searchParams = request.nextUrl.searchParams;
     const rangeStart = searchParams.get("rangeStart") ?? format(subDays(new Date(), 30), "yyyy-MM-dd");
     const rangeEnd   = searchParams.get("rangeEnd")   ?? format(new Date(), "yyyy-MM-dd");
 
@@ -102,7 +104,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const { searchParams } = new URL(request.url);
+  const searchParams = request.nextUrl.searchParams;
   const rangeStart = searchParams.get("rangeStart") ?? format(subDays(new Date(), 30), "yyyy-MM-dd");
   const rangeEnd   = searchParams.get("rangeEnd")   ?? format(new Date(), "yyyy-MM-dd");
   const patId = authCtx.patientId as `${string}-${string}-${string}-${string}-${string}`;

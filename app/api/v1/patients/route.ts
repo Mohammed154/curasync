@@ -7,12 +7,14 @@ import { db, patientProfiles, alertEvents, medicationLogs } from "@/lib/db";
 import { getProviderAuth, isNextResponse } from "@/lib/auth";
 import { writeAuditLog, getRequestMeta } from "@/lib/audit";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(request: NextRequest) {
   const requestId = nanoid(12);
   const authCtx = await getProviderAuth(request);
   if (isNextResponse(authCtx)) return authCtx;
 
-  const { searchParams } = new URL(request.url);
+  const searchParams = request.nextUrl.searchParams;
   const sortBy       = searchParams.get("sortBy") ?? "alertCount";
   const order        = searchParams.get("order") ?? "desc";
   const filterStatus = searchParams.get("alertStatus");

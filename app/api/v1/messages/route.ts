@@ -43,12 +43,14 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({ data: inserted, requestId, timestamp: new Date().toISOString() }, { status: 201 });
 }
 
+export const dynamic = "force-dynamic";
+
 export async function GET(request: NextRequest) {
   const requestId = nanoid(12);
   const authCtx = await getPatientAuth(request);
   if (isNextResponse(authCtx)) return authCtx;
 
-  const { searchParams } = new URL(request.url);
+  const searchParams = request.nextUrl.searchParams;
   const threadId = searchParams.get("threadId");
 
   const rows = await db.select().from(messages)

@@ -26,6 +26,8 @@ const OnboardingSchema = z.object({
   }).optional(),
 });
 
+export const dynamic = "force-dynamic";
+
 export async function POST(request: NextRequest) {
   const requestId = nanoid(12);
 

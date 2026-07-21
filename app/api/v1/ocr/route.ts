@@ -13,6 +13,8 @@ const OcrRequestSchema = z.object({
   mimeType:    z.enum(["image/jpeg", "image/png", "image/webp", "application/pdf"]),
 });
 
+export const dynamic = "force-dynamic";
+
 export async function POST(request: NextRequest) {
   const requestId = nanoid(12);
 

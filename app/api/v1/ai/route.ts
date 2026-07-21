@@ -59,6 +59,8 @@ STRICT RULES:
 - If the patient describes an emergency, immediately direct them to call 112.
 - Do not reproduce or reference any previous session's conversation.`;
 
+export const dynamic = "force-dynamic";
+
 export async function POST(request: NextRequest) {
   const requestId = nanoid(12);
 

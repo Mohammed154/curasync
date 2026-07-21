@@ -37,6 +37,8 @@ async function verifySignature(request: NextRequest, body: string): Promise<bool
   } catch { return false; }
 }
 
+export const dynamic = "force-dynamic";
+
 export async function POST(request: NextRequest) {
   const requestId = nanoid(12);
   const rawBody = await request.text();

@@ -15,6 +15,8 @@ const MedicationLogSchema = z.object({
   skippedReason: z.string().max(200).optional(),
 });
 
+export const dynamic = "force-dynamic";
+
 export async function POST(request: NextRequest) {
   const requestId = nanoid(12);
   const authCtx = await getPatientAuth(request);

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import postgres from "postgres";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   const url = process.env.DATABASE_URL;
   if (!url) {
@@ -8,6 +10,12 @@ export async function GET() {
   }
 
   let sql: postgres.Sql | undefined;
+
+  try {
+    new URL(url);
+  } catch {
+    return NextResponse.json({ error: "DATABASE_URL is invalid" }, { status: 500 });
+  }
 
   try {
     sql = postgres(url, { connect_timeout: 15, idle_timeout: 5 });

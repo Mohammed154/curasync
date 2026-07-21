@@ -8,12 +8,14 @@ import { db, alertEvents } from "@/lib/db";
 import { getPatientAuth, isNextResponse } from "@/lib/auth";
 import { writeAuditLog, getRequestMeta } from "@/lib/audit";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(request: NextRequest) {
   const requestId = nanoid(12);
   const authCtx = await getPatientAuth(request);
   if (isNextResponse(authCtx)) return authCtx;
 
-  const { searchParams } = new URL(request.url);
+  const searchParams = request.nextUrl.searchParams;
   const status = searchParams.get("status"); // active | acknowledged | dismissed
   const patId = authCtx.patientId as `${string}-${string}-${string}-${string}-${string}`;
 

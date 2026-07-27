@@ -11,7 +11,7 @@
 | Product | CuraSync — Multi-Chronic Disease Health Monitoring Platform |
 | Stack | Next.js 14 App Router · TypeScript strict · Tailwind CSS |
 | DB | Supabase PostgreSQL + TimescaleDB (Drizzle ORM) |
-| Auth | Clerk v7 (async `await auth()`) |
+| Auth | None (Clerk removed — auto-bypass dev identity) |
 | Deploy | Vercel (region: bom1 Mumbai) |
 | Compliance | HIPAA + DPDP Act 2023 |
 | Tests | Vitest — 80 tests passing |
@@ -20,10 +20,9 @@
 
 ## Non-Negotiable Rules
 
-1. **`await auth()`** — Clerk v7 is async. Never call `auth()` without await.
-2. **No `any` types** — TypeScript strict mode enforced (`noImplicitAny: true`).
-3. **No hardcoded colours** — use `lib/design-tokens.ts` or Tailwind tokens only.
-4. **All API routes must call `getPatientAuth()` or `getProviderAuth()`** before touching DB.
+1. **No `any` types** — TypeScript strict mode enforced (`noImplicitAny: true`).
+2. **No hardcoded colours** — use `lib/design-tokens.ts` or Tailwind tokens only.
+3. **All API routes must call `getPatientAuth()` or `getProviderAuth()`** before touching DB.
 5. **All PHI access must call `writeAuditLog()`** (fire-and-forget is fine).
 6. **Rate limits via Upstash** — never in-memory Maps (breaks serverless).
 7. **Readings go to TimescaleDB hypertable** — the `readings` table is partitioned on `recorded_at`.

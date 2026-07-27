@@ -4,8 +4,7 @@ import { NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const dbUrl    = process.env.DATABASE_URL ?? "";
-  const clerkKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ?? "";
+  const dbUrl = process.env.DATABASE_URL ?? "";
 
   // 1. Check env vars
   const envCheck = {
@@ -15,9 +14,6 @@ export async function GET() {
     DATABASE_URL_HAS_SSL: dbUrl.includes("sslmode=require"),
     IS_POOLER_URL:        dbUrl.includes("pooler.supabase.com") || dbUrl.includes(":6543"),
     IS_DIRECT_URL:        dbUrl.includes(":5432"),
-    CLERK_KEY_SET:        clerkKey.length > 0,
-    CLERK_KEY_TYPE:       clerkKey.startsWith("pk_live_") ? "LIVE ✅" : clerkKey.startsWith("pk_test_") ? "TEST ⚠️" : "NOT SET ❌",
-    CLERK_SECRET_SET:     !!process.env.CLERK_SECRET_KEY,
     UPSTASH_SET:          !!process.env.UPSTASH_REDIS_REST_URL,
     NODE_ENV:             process.env.NODE_ENV,
     REGION:               process.env.VERCEL_REGION ?? "unknown",

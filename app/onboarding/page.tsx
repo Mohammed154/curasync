@@ -12,18 +12,6 @@ import { conditionColors } from "@/lib/design-tokens";
 import type { ConditionId } from "@/types";
 import { saveOnboardingProfile } from "@/hooks/useApi";
 
-// Safe Clerk hook — gracefully handles missing ClerkProvider in non-auth environments
-function useSafeUser() {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { useUser } = require("@clerk/nextjs");
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    return useUser() as { user: { fullName?: string | null; firstName?: string | null } | null };
-  } catch {
-    return { user: null };
-  }
-}
-
 const MAX_CONDITIONS = 5;
 
 const ALL_CONDITIONS: { id: ConditionId; label: string; description: string }[] = [
@@ -40,7 +28,6 @@ const ALL_CONDITIONS: { id: ConditionId; label: string; description: string }[] 
 ];
 
 export default function OnboardingPage() {
-  const { user } = useSafeUser();
   const router = useRouter();
   const [selected, setSelected] = useState<Set<ConditionId>>(new Set());
   const [saving, setSaving] = useState(false);
@@ -63,15 +50,11 @@ export default function OnboardingPage() {
     sessionStorage.setItem("curasync_conditions", JSON.stringify(Array.from(selected)));
 
     try {
-      // If Clerk is active and user is loaded, save to DB
-      if (user) {
-        await saveOnboardingProfile({
-          name:        user.fullName ?? user.firstName ?? "Patient",
-          dateOfBirth: "1990-01-01",
-          conditions:  Array.from(selected),
-        });
-      }
-      // Navigate regardless — DB save is best-effort in dev without credentials
+      await saveOnboardingProfile({
+        name:        "Patient",
+        dateOfBirth: "1990-01-01",
+        conditions:  Array.from(selected),
+      });
       router.push("/onboarding/baselines");
     } catch {
       // Still navigate — don't block the user on a network error

@@ -15,27 +15,9 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-// Determine if Clerk is properly configured (real key, not placeholder)
-const CLERK_KEY = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ?? "";
-const CLERK_CONFIGURED = CLERK_KEY.startsWith("pk_live_") || CLERK_KEY.startsWith("pk_test_") && CLERK_KEY.length > 20;
-
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  if (CLERK_CONFIGURED) {
-    const { ClerkProvider } = await import("@clerk/nextjs");
-    return (
-      <ClerkProvider>
-        <html lang="en" suppressHydrationWarning className={cn("font-sans", inter.variable)}>
-          <body className="bg-bg-light font-sans text-text-primary antialiased">
-            {children}
-          </body>
-        </html>
-      </ClerkProvider>
-    );
-  }
-
-  // Build-time fallback — no Clerk (used when NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY is not set)
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning className={cn("font-sans", inter.variable)}>
       <body className="bg-bg-light font-sans text-text-primary antialiased">
         {children}
       </body>

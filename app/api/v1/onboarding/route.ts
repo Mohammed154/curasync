@@ -1,11 +1,10 @@
 // app/api/v1/onboarding/route.ts
-// Creates or updates the patient profile in Supabase after Clerk signup.
-// Called from the onboarding flow once the user selects their conditions.
+// Creates or updates the patient profile in Supabase after onboarding.
 
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { nanoid } from "nanoid";
-import { auth } from "@clerk/nextjs/server";
+import { getPatientAuth, isNextResponse } from "@/lib/auth";
 import { db, patientProfiles } from "@/lib/db";
 import { eq } from "drizzle-orm";
 import { writeAuditLog, getRequestMeta } from "@/lib/audit";
@@ -31,11 +30,8 @@ export const dynamic = "force-dynamic";
 export async function POST(request: NextRequest) {
   const requestId = nanoid(12);
 
-  // Clerk v7 async auth
-  const session = await auth();
-  if (!session.userId) {
-    return NextResponse.json({ error: "Unauthorized", code: "NOT_AUTHENTICATED", requestId }, { status: 401 });
-  }
+  const authCtx = await getPatientAuth(request);
+  if (isNextResponse(authCtx)) return authCtx;
 
   let body: unknown;
   try { body = await request.json(); } catch {
@@ -55,7 +51,7 @@ export async function POST(request: NextRequest) {
     existing = await db
       .select({ id: patientProfiles.id })
       .from(patientProfiles)
-      .where(eq(patientProfiles.userId, session.userId))
+      .where(eq(patientProfiles.userId, authCtx.clerkUserId))
       .limit(1);
 
     if (existing.length > 0 && existing[0]) {
@@ -69,7 +65,7 @@ export async function POST(request: NextRequest) {
           emergencyContact: emergencyContact ?? null,
           updatedAt: new Date(),
         })
-        .where(eq(patientProfiles.userId, session.userId))
+        .where(eq(patientProfiles.userId, authCtx.clerkUserId))
         .returning();
       profile = updated;
     } else {
@@ -77,7 +73,7 @@ export async function POST(request: NextRequest) {
       const [inserted] = await db
         .insert(patientProfiles)
         .values({
-          userId:           session.userId,
+          userId:           authCtx.clerkUserId,
           name,
           dateOfBirth,
           conditions,
@@ -95,7 +91,7 @@ export async function POST(request: NextRequest) {
   }
 
   void writeAuditLog({
-    actorId:    session.userId,
+    actorId:    authCtx.clerkUserId,
     action:     "WRITE",
     resource:   "patient_profiles",
     resourceId: profile?.id,
@@ -111,17 +107,16 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   const requestId = nanoid(12);
-  const session = await auth();
-  if (!session.userId) {
-    return NextResponse.json({ error: "Unauthorized", code: "NOT_AUTHENTICATED", requestId }, { status: 401 });
-  }
+
+  const authCtx = await getPatientAuth(request);
+  if (isNextResponse(authCtx)) return authCtx;
 
   let profile;
   try {
     const rows = await db
       .select()
       .from(patientProfiles)
-      .where(eq(patientProfiles.userId, session.userId))
+      .where(eq(patientProfiles.userId, authCtx.clerkUserId))
       .limit(1);
     profile = rows[0];
   } catch (dbErr: any) {

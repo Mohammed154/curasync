@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useClerk } from "@clerk/nextjs";
 import {
   LayoutDashboard, Stethoscope, Pill, BookOpen, Bell,
   Settings, LogOut, Menu, X, Heart, ChevronDown, MapPin,
@@ -40,9 +39,6 @@ const PROVIDER_NAV: NavItem[] = [
   { label: "Settings",       href: "/settings",         icon: Settings },
 ];
 
-const CLERK_KEY = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ?? "";
-const CLERK_CONFIGURED = (CLERK_KEY.startsWith("pk_live_") || CLERK_KEY.startsWith("pk_test_")) && CLERK_KEY.length > 20;
-
 interface SafeSignOutButtonProps {
   children: React.ReactNode;
   onClick?: () => void;
@@ -56,14 +52,6 @@ export function SafeSignOutButton({
 }: SafeSignOutButtonProps) {
   const router = useRouter();
 
-  if (CLERK_CONFIGURED) {
-    return (
-      <ClerkSignOutHelper onClick={onClick} className={className}>
-        {children}
-      </ClerkSignOutHelper>
-    );
-  }
-
   const handleDemoSignOut = () => {
     if (onClick) onClick();
     router.push("/");
@@ -71,24 +59,6 @@ export function SafeSignOutButton({
 
   return (
     <button onClick={handleDemoSignOut} className={className}>
-      {children}
-    </button>
-  );
-}
-
-// Inner helper that uses useClerk safely only when Clerk is active
-function ClerkSignOutHelper({
-  children,
-  onClick,
-  className
-}: SafeSignOutButtonProps) {
-  const { signOut } = useClerk();
-  const handleSignOut = async () => {
-    if (onClick) onClick();
-    await signOut({ redirectUrl: "/" });
-  };
-  return (
-    <button onClick={handleSignOut} className={className}>
       {children}
     </button>
   );

@@ -17,7 +17,6 @@
     "prepare": "node -e \"try{require(\"husky\").install()}catch(e){}\""
   },
   "dependencies": {
-    "@clerk/nextjs": "^6.39.3",
     "@fontsource/plus-jakarta-sans": "^5.2.8",
     "@supabase/supabase-js": "^2.109.0",
     "class-variance-authority": "^0.7.1",

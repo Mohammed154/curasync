@@ -11,8 +11,6 @@ interface EnvSpec {
 const ENV_SPECS: EnvSpec[] = [
   // Always required
   { key: "NEXT_PUBLIC_APP_URL",                required: "always",     description: "Public app URL for redirects" },
-  { key: "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY",  required: "always",     description: "Clerk publishable key" },
-  { key: "CLERK_SECRET_KEY",                   required: "always",     description: "Clerk secret key" },
 
   // Production required
   { key: "DATABASE_URL",                       required: "production",  description: "Supabase PostgreSQL connection string (pooler)" },

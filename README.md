@@ -1,5 +1,6 @@
 # CuraSync — Smart Health Monitoring Platform
 
+
 > **MVP Scaffold · May 2026**  
 > Next.js 14 · TypeScript strict · Supabase · Clerk v7 · Tailwind CSS · Vercel
 

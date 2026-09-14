@@ -27,11 +27,9 @@ interface ReadingConfig {
 const READING_TYPES: ReadingConfig[] = [
   { type: "blood_glucose",              label: "Blood Glucose",    icon: "🩸", unit: "mg/dL",  placeholder: "e.g. 142", min: 20,  max: 600,  color: "#00CEC9", bg: "#E6FAF9" },
   { type: "blood_pressure_systolic",    label: "Blood Pressure",   icon: "💉", unit: "mmHg",   placeholder: "systolic", min: 60,  max: 250,  color: "#E84393", bg: "#F0EFF8" },
-  { type: "heart_rate",                 label: "Heart Rate",       icon: "❤️", unit: "bpm",    placeholder: "e.g. 74",  min: 30,  max: 220,  color: "#E84393", bg: "#FFF0F7" },
   { type: "spo2",                       label: "SpO₂",             icon: "💨", unit: "%",      placeholder: "e.g. 97",  min: 70,  max: 100,  color: "#74B9FF", bg: "#EBF5FB" },
   { type: "weight",                     label: "Weight",           icon: "⚖️", unit: "kg",     placeholder: "e.g. 84",  min: 20,  max: 300,  color: "#A29BFE", bg: "#F0EFF8" },
   { type: "body_temp",                  label: "Temperature",      icon: "🌡️", unit: "°C",     placeholder: "e.g. 37.2",min: 34,  max: 42,   color: "#FDCB6E", bg: "#FEF9E7" },
-  { type: "peak_flow",                  label: "Peak Flow",        icon: "🫁", unit: "L/min",  placeholder: "e.g. 380", min: 60,  max: 900,  color: "#74B9FF", bg: "#EBF5FB" },
   { type: "steps",                      label: "Steps",            icon: "🚶", unit: "steps",  placeholder: "e.g. 7500",min: 0,   max: 60000, color: "#00B894", bg: "#E8F8F5" },
 ];
 
@@ -123,7 +121,7 @@ export default function LogReadingModal({ open, onClose, onSaved }: LogReadingMo
           {/* Metric type selector */}
           <div>
             <label className="block text-label-sm font-semibold text-text-secondary mb-2">Metric type</label>
-            <div className="grid grid-cols-4 gap-1.5">
+            <div className="grid grid-cols-3 gap-2">
               {READING_TYPES.map((rt) => (
                 <button
                   key={rt.type}

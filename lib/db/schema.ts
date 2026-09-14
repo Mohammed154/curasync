@@ -149,14 +149,48 @@ export const auditLog = pgTable("audit_log", {
   createdAt:  timestamp("created_at", { withTimezone: true }).defaultNow(),
 });
 
+// ─── consultations (Telehealth Video Rooms) ──────────────────────────────────
+
+export const consultations = pgTable("consultations", {
+  id:           uuid("id").primaryKey().defaultRandom(),
+  patientId:    uuid("patient_id").notNull().references(() => patientProfiles.id, { onDelete: "cascade" }),
+  providerId:   text("provider_id").notNull(),
+  scheduledAt:  timestamp("scheduled_at", { withTimezone: true }).notNull(),
+  durationMin:  integer("duration_min").notNull().default(20),
+  status:       text("status").notNull().default("scheduled"), // scheduled | in_progress | completed | cancelled | no_show
+  roomUrl:      text("room_url"),
+  roomName:     text("room_name"),
+  notes:        text("notes"),
+  createdAt:    timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt:    timestamp("updated_at", { withTimezone: true }).defaultNow(),
+});
+
+// ─── follow_up_reminders (Calendar Follow-ups & Alerts) ──────────────────────
+
+export const followUpReminders = pgTable("follow_up_reminders", {
+  id:                    uuid("id").primaryKey().defaultRandom(),
+  patientId:             uuid("patient_id").notNull().references(() => patientProfiles.id, { onDelete: "cascade" }),
+  createdBy:             text("created_by").notNull(),
+  title:                 text("title").notNull(),
+  description:           text("description"),
+  dueDate:               timestamp("due_date", { withTimezone: true }).notNull(),
+  reminderType:          text("reminder_type").notNull().default("general"), // general | lab_test | consultation | medication_review
+  relatedConsultationId: uuid("related_consultation_id").references(() => consultations.id, { onDelete: "set null" }),
+  status:                text("status").notNull().default("pending"), // pending | completed | dismissed
+  notifyAt:              timestamp("notify_at", { withTimezone: true }).array(),
+  createdAt:             timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+
 // ─── Relations ────────────────────────────────────────────────────────────────
 
 export const patientRelations = relations(patientProfiles, ({ many }) => ({
-  readings:       many(readings),
-  medications:    many(medications),
-  medicationLogs: many(medicationLogs),
-  alertEvents:    many(alertEvents),
-  journalEntries: many(journalEntries),
+  readings:          many(readings),
+  medications:       many(medications),
+  medicationLogs:    many(medicationLogs),
+  alertEvents:       many(alertEvents),
+  journalEntries:    many(journalEntries),
+  consultations:     many(consultations),
+  followUpReminders: many(followUpReminders),
 }));
 
 export const medicationRelations = relations(medications, ({ one, many }) => ({
@@ -164,20 +198,36 @@ export const medicationRelations = relations(medications, ({ one, many }) => ({
   logs:    many(medicationLogs),
 }));
 
+export const consultationRelations = relations(consultations, ({ one, many }) => ({
+  patient:   one(patientProfiles, { fields: [consultations.patientId], references: [patientProfiles.id] }),
+  reminders: many(followUpReminders),
+}));
+
+export const reminderRelations = relations(followUpReminders, ({ one }) => ({
+  patient:      one(patientProfiles, { fields: [followUpReminders.patientId], references: [patientProfiles.id] }),
+  consultation: one(consultations, { fields: [followUpReminders.relatedConsultationId], references: [consultations.id] }),
+}));
+
 // ─── TypeScript types inferred from schema ────────────────────────────────────
 
-export type PatientProfile   = typeof patientProfiles.$inferSelect;
-export type NewPatientProfile = typeof patientProfiles.$inferInsert;
-export type Reading          = typeof readings.$inferSelect;
-export type NewReading       = typeof readings.$inferInsert;
-export type Medication       = typeof medications.$inferSelect;
-export type NewMedication    = typeof medications.$inferInsert;
-export type MedicationLog    = typeof medicationLogs.$inferSelect;
-export type NewMedicationLog = typeof medicationLogs.$inferInsert;
-export type AlertEvent       = typeof alertEvents.$inferSelect;
-export type NewAlertEvent    = typeof alertEvents.$inferInsert;
-export type JournalEntry     = typeof journalEntries.$inferSelect;
-export type NewJournalEntry  = typeof journalEntries.$inferInsert;
-export type Message          = typeof messages.$inferSelect;
-export type NewMessage       = typeof messages.$inferInsert;
-export type AuditLog         = typeof auditLog.$inferSelect;
+export type PatientProfile      = typeof patientProfiles.$inferSelect;
+export type NewPatientProfile    = typeof patientProfiles.$inferInsert;
+export type Reading             = typeof readings.$inferSelect;
+export type NewReading          = typeof readings.$inferInsert;
+export type Medication          = typeof medications.$inferSelect;
+export type NewMedication       = typeof medications.$inferInsert;
+export type MedicationLog       = typeof medicationLogs.$inferSelect;
+export type NewMedicationLog    = typeof medicationLogs.$inferInsert;
+export type AlertEvent          = typeof alertEvents.$inferSelect;
+export type NewAlertEvent       = typeof alertEvents.$inferInsert;
+export type JournalEntry        = typeof journalEntries.$inferSelect;
+export type NewJournalEntry     = typeof journalEntries.$inferInsert;
+export type Message             = typeof messages.$inferSelect;
+export type NewMessage          = typeof messages.$inferInsert;
+export type Consultation        = typeof consultations.$inferSelect;
+export type NewConsultation     = typeof consultations.$inferInsert;
+export type FollowUpReminder    = typeof followUpReminders.$inferSelect;
+export type NewFollowUpReminder = typeof followUpReminders.$inferInsert;
+export type AuditLog            = typeof auditLog.$inferSelect;
+
+

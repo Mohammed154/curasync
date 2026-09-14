@@ -1,22 +1,22 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import AppShell from "@/components/layout/AppShell";
 import AlertBanner from "@/components/ui/AlertBanner";
-import ConditionTile from "@/components/patient/ConditionTile";
 import VitalCard from "@/components/patient/VitalCard";
 import MedicationCard from "@/components/patient/MedicationCard";
 import GlucoseChart from "@/components/charts/GlucoseChart";
-import GlucoseLogChart from "@/components/charts/GlucoseLogChart";
-import AdherenceStreakCard from "@/components/patient/AdherenceStreakCard";
 import LogReadingModal from "@/components/modals/LogReadingModal";
 import WeeklySummaryCard, { DEFAULT_WEEKLY_SUMMARY } from "@/components/dashboard/WeeklySummaryCard";
 import UpcomingRemindersStrip, { MOCK_UPCOMING_DOSES } from "@/components/dashboard/UpcomingRemindersStrip";
-import { getMockDashboardData, getStreamedReading, getMockGlucoseLog } from "@/lib/mock-data";
-import type { DashboardData, Alert, TodayMedication, BiometricType } from "@/types";
+import AdherenceStreakCard from "@/components/patient/AdherenceStreakCard";
+import ConditionTile from "@/components/patient/ConditionTile";
+import { getMockDashboardData, getStreamedReading } from "@/lib/mock-data";
+import { getRelevantVitalKeysForConditions, VITAL_METADATA } from "@/lib/condition-vitals-map";
+import type { DashboardData, Alert, TodayMedication } from "@/types";
 import { format } from "date-fns";
-import { RefreshCw, Download, PlusCircle, Sparkles, MessageCircle, CalendarDays } from "lucide-react";
 import Link from "next/link";
+import { RefreshCw, PlusCircle, ChevronDown, ChevronUp, Video } from "lucide-react";
 
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData>(() => getMockDashboardData());
@@ -25,6 +25,7 @@ export default function DashboardPage() {
   const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [logModalOpen, setLogModalOpen] = useState(false);
+  const [showMoreWidgets, setShowMoreWidgets] = useState(false);
 
   const markUpcomingDoseTaken = (doseId: string) => {
     const dose = upcomingDoses.find((d) => d.id === doseId);
@@ -62,16 +63,6 @@ export default function DashboardPage() {
     }, 600);
   }, []);
 
-  const handlePdfExport = useCallback(async () => {
-    try {
-      const { generateCuraSyncMetricsPDF } = await import("@/lib/pdf");
-      await generateCuraSyncMetricsPDF();
-    } catch (error) {
-      console.error('PDF export error:', error);
-      alert(`Failed to export PDF: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`);
-    }
-  }, []);
-
   useEffect(() => {
     const id = setInterval(refresh, 8000);
     return () => clearInterval(id);
@@ -94,30 +85,17 @@ export default function DashboardPage() {
 
   const { patient, latestReadings, conditionSummaries, weeklyAdherence, streakDays, recentReadings, todayMedications } = data;
 
-  // ── Derive vital status ────────────────────────────────────────────────────
-  const bgStatus: "green" | "amber" | "red" =
-    latestReadings.bloodGlucose > 250 ? "red" :
-    latestReadings.bloodGlucose > 180 ? "amber" : "green";
-
-  const bpStatus: "green" | "amber" | "red" =
-    latestReadings.systolic > 180 ? "red" :
-    latestReadings.systolic > 140 ? "amber" : "green";
-
-  const hrStatus: "green" | "amber" | "red" =
-    latestReadings.heartRate > 100 || latestReadings.heartRate < 50 ? "amber" : "green";
-
-  const spo2Status: "green" | "amber" | "red" =
-    latestReadings.spo2 < 90 ? "red" :
-    latestReadings.spo2 < 94 ? "amber" : "green";
-
-  const takenCount = todayMedications.filter((m) => m.status === "taken").length;
-  const totalMeds  = todayMedications.length;
+  // ── Condition-derived relevant vitals (Capped at 4) ───────────────────────
+  const relevantVitalKeys = useMemo(
+    () => getRelevantVitalKeysForConditions(patient.conditions, 4),
+    [patient.conditions]
+  );
 
   return (
     <AppShell alertCount={alerts.length}>
-      <div className="max-w-6xl mx-auto px-4 lg:px-6 py-6 space-y-6">
+      <div className="max-w-5xl mx-auto px-4 lg:px-6 py-6 space-y-6">
 
-        {/* ── Page header ─────────────────────────────────────────────────── */}
+        {/* ── 1. Greeting Header ─────────────────────────────────────────── */}
         <div className="flex items-start justify-between gap-4 animate-fade-in">
           <div>
             <h1 className="font-bold text-display text-text-primary leading-tight">
@@ -132,6 +110,15 @@ export default function DashboardPage() {
           </div>
 
           <div className="flex items-center gap-2 flex-shrink-0">
+            {/* Live Video Consultation action */}
+            <Link
+              href="/telehealth"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-status-green hover:opacity-90 text-white text-label-sm font-bold shadow-card transition-all"
+            >
+              <Video size={15} aria-hidden="true" />
+              <span>Video Call</span>
+            </Link>
+
             {/* Manual refresh */}
             <button
               onClick={refresh}
@@ -143,312 +130,138 @@ export default function DashboardPage() {
                 className={isRefreshing ? "animate-spin" : ""}
               />
             </button>
-            {/* Quick add FAB */}
+            {/* Log reading action */}
             <button
               onClick={() => setLogModalOpen(true)}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg gradient-violet text-white text-label-sm font-semibold shadow-card hover:opacity-90 transition-opacity"
+              className="flex items-center gap-2 px-3.5 py-2 rounded-lg gradient-violet text-white text-label-sm font-semibold shadow-card hover:opacity-90 transition-opacity"
             >
               <PlusCircle size={15} aria-hidden="true" />
-              <span className="hidden sm:inline">Log Reading</span>
+              <span>Log Reading</span>
             </button>
           </div>
         </div>
 
-        {/* ── AI Doctor Banner ──────────────────────────────────────────────── */}
-        <Link
-          href="/ai-doctor"
-          className="block rounded-xl overflow-hidden card-enter hover:opacity-95 transition-opacity"
-          style={{ background: "#0A0A0A" }}
-          aria-label="Open AI Doctor chat"
-        >
-          <div className="flex items-center justify-between p-5">
-            <div className="flex-1 min-w-0 pr-4">
-              <p className="text-white/50 text-xs font-semibold uppercase tracking-widest mb-1">CuraSync AI</p>
-              <h2 className="text-white font-bold text-xl leading-tight mb-1.5">Ask AI Doctor</h2>
-              <p className="text-white/60 text-xs leading-relaxed line-clamp-2">
-                Get plain-language explanations of your readings, medication questions, and what to ask your doctor.
-              </p>
-              <div className="flex items-center gap-1.5 mt-3 text-accent-lavender text-xs font-semibold">
-                <Sparkles size={12} aria-hidden="true" />
-                Powered by Gemini · Not medical advice
+        {/* ── Live Telehealth Video Call Banner ─────────────────────────────── */}
+        <section aria-label="Live Video Consultation">
+          <div className="rounded-2xl p-4 sm:p-5 bg-gradient-to-r from-[#1B1238] via-[#0F172A] to-[#0A2522] border border-violet-800/40 shadow-card flex flex-col sm:flex-row sm:items-center justify-between gap-4 card-enter">
+            <div className="flex items-center gap-3.5">
+              <div className="w-11 h-11 rounded-xl gradient-violet flex items-center justify-center text-white flex-shrink-0 shadow-md">
+                <Video size={20} />
               </div>
-            </div>
-            {/* Orb */}
-            <div className="w-20 h-20 rounded-full flex-shrink-0 relative" aria-hidden="true">
-              <div className="absolute inset-0 rounded-full"
-                style={{ background: "conic-gradient(from 0deg, #6c5ce7, #a29bfe, #e84393, #00cec9, #6c5ce7)", animation: "orbSpin 8s linear infinite" }} />
-              <div className="absolute inset-2 rounded-full flex items-center justify-center"
-                style={{ background: "rgba(10,10,10,0.7)" }}>
-                <MessageCircle size={22} className="text-white" />
-              </div>
-            </div>
-          </div>
-          <style>{`@keyframes orbSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
-        </Link>
-
-        {/* ── Active alerts ────────────────────────────────────────────────── */}
-        {alerts.length > 0 && (
-          <AlertBanner alerts={alerts} onDismiss={dismissAlert} />
-        )}
-
-        {/* ── Today at a Glance card ───────────────────────────────────────── */}
-        <div
-          className="rounded-xl p-4 lg:p-5 gradient-dark text-white card-enter"
-          role="region"
-          aria-label="Today at a glance"
-        >
-          <div className="flex items-start justify-between mb-4">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-widest text-white/50 mb-1">
-                Today at a Glance
-              </p>
-              <p className="text-sm text-white/70">
-                Last synced {format(new Date(latestReadings.lastSyncedAt), "h:mm a")}
-                {isRefreshing && (
-                  <span className="ml-2 text-accent-lavender animate-pulse">
-                    · Updating…
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="font-bold text-sm text-white">Live Clinical Consultation</h2>
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-bold">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    Doctor Ready
                   </span>
-                )}
-              </p>
+                </div>
+                <p className="text-xs text-slate-300 mt-0.5">
+                  Dr. Priya Sharma is available for your chronic care telehealth consultation.
+                </p>
+              </div>
             </div>
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10">
-              <span className="w-1.5 h-1.5 rounded-full bg-status-green animate-pulse" aria-hidden="true" />
-              <span className="text-xs font-semibold text-white">Live</span>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {/* Medications */}
-            <div className="bg-white/8 rounded-lg p-3 col-span-2 sm:col-span-1">
-              <p className="text-xs text-white/50 mb-1">Medications</p>
-              <p className="font-bold text-white" style={{ fontSize: "22px" }}>
-                {takenCount}<span className="text-white/50 font-normal text-sm">/{totalMeds}</span>
-              </p>
-              <p className="text-xs text-white/50 mt-0.5">taken today</p>
-            </div>
-
-            <div className="bg-white/8 rounded-lg p-3">
-              <p className="text-xs text-white/50 mb-1">Blood Sugar</p>
-              <p
-                className="font-bold metric-value"
-                style={{
-                  fontSize: "22px",
-                  color: bgStatus === "green" ? "#00CEC9" : bgStatus === "amber" ? "#FDCB6E" : "#D63031",
-                }}
-              >
-                {latestReadings.bloodGlucose}
-              </p>
-              <p className="text-xs text-white/50 mt-0.5">mg/dL</p>
-            </div>
-
-            <div className="bg-white/8 rounded-lg p-3">
-              <p className="text-xs text-white/50 mb-1">Blood Pressure</p>
-              <p
-                className="font-bold metric-value"
-                style={{
-                  fontSize: "18px",
-                  color: bpStatus === "green" ? "#00CEC9" : bpStatus === "amber" ? "#FDCB6E" : "#D63031",
-                }}
-              >
-                {latestReadings.systolic}/{latestReadings.diastolic}
-              </p>
-              <p className="text-xs text-white/50 mt-0.5">mmHg</p>
-            </div>
-
-            <div className="bg-white/8 rounded-lg p-3">
-              <p className="text-xs text-white/50 mb-1">Heart Rate</p>
-              <p
-                className="font-bold metric-value"
-                style={{
-                  fontSize: "22px",
-                  color: hrStatus === "green" ? "#00CEC9" : "#FDCB6E",
-                }}
-              >
-                {latestReadings.heartRate}
-              </p>
-              <p className="text-xs text-white/50 mt-0.5">bpm</p>
-            </div>
-          </div>
-        </div>
-
-        {/* ── Vitals grid ──────────────────────────────────────────────────── */}
-        <section aria-labelledby="vitals-heading">
-          <h2 id="vitals-heading" className="font-semibold text-title-md text-text-primary mb-3">
-            Latest Readings
-          </h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            <Link href="/glucose" className="block hover:scale-[1.01] transition-transform">
-              <VitalCard
-                label="Blood Glucose"
-                value={String(latestReadings.bloodGlucose)}
-                unit="mg/dL"
-                status={bgStatus}
-                icon="🩸"
-                sublabel="Fasting"
-                animate
-              />
-            </Link>
-            <Link href="/conditions/hypertension" className="block hover:scale-[1.01] transition-transform">
-              <VitalCard
-                label="Blood Pressure"
-                value={`${latestReadings.systolic}/${latestReadings.diastolic}`}
-                unit="mmHg"
-                status={bpStatus}
-                icon="💉"
-                animate
-              />
-            </Link>
-            <Link href="/conditions/hypertension" className="block hover:scale-[1.01] transition-transform">
-              <VitalCard
-                label="Heart Rate"
-                value={String(latestReadings.heartRate)}
-                unit="bpm"
-                status={hrStatus}
-                icon="❤️"
-                animate
-              />
-            </Link>
-            <Link href="/conditions/copd" className="block hover:scale-[1.01] transition-transform">
-              <VitalCard
-                label="SpO₂"
-                value={String(latestReadings.spo2)}
-                unit="%"
-                status={spo2Status}
-                icon="💨"
-                sublabel="Blood oxygen"
-                animate
-              />
-            </Link>
-            <VitalCard
-              label="Weight"
-              value={String(latestReadings.weight)}
-              unit="kg"
-              status="green"
-              icon="⚖️"
-            />
-            <Link href="/calendar" className="block hover:scale-[1.01] transition-transform">
-              <VitalCard
-                label="Streak"
-                value={String(streakDays)}
-                unit="days"
-                status="green"
-                icon="🔥"
-                sublabel="Adherence"
-              />
+            <Link
+              href="/telehealth"
+              className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-status-green hover:opacity-90 text-white font-bold text-xs shadow-md transition-all active:scale-95 flex-shrink-0"
+            >
+              <Video size={14} />
+              <span>Start Live Video Call</span>
             </Link>
           </div>
         </section>
 
-        {/* ── Condition tiles ───────────────────────────────────────────────── */}
-        <section aria-labelledby="conditions-heading">
-          <div className="flex items-center justify-between mb-3">
-            <h2 id="conditions-heading" className="font-semibold text-title-md text-text-primary">
-              My Conditions
-            </h2>
-            <Link href="/conditions" className="text-label-sm font-semibold text-accent-violet hover:text-accent-lavender transition-colors">
-              View all →
-            </Link>
-          </div>
+        {/* ── 2. Hero Vitals Row (Condition-derived, Max 4) ─────────────────── */}
+        <section aria-label="Hero Vitals">
           <div
-            className="grid gap-3"
-            style={{
-              gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
-            }}
+            className={`grid gap-3 ${
+              relevantVitalKeys.length === 1
+                ? "grid-cols-1"
+                : relevantVitalKeys.length === 2
+                ? "grid-cols-1 sm:grid-cols-2"
+                : relevantVitalKeys.length === 3
+                ? "grid-cols-1 sm:grid-cols-3"
+                : "grid-cols-2 sm:grid-cols-4"
+            }`}
           >
-            {conditionSummaries.map((s) => (
-              <Link key={s.conditionId} href={`/conditions/${s.conditionId}`} className="block hover:scale-[1.01] transition-transform">
-                <ConditionTile summary={s} />
-              </Link>
-            ))}
+            {relevantVitalKeys.map((vitalKey) => {
+              const meta = VITAL_METADATA[vitalKey];
+              if (!meta) return null;
+
+              return (
+                <VitalCard
+                  key={meta.key}
+                  label={meta.label}
+                  value={meta.getValue(latestReadings)}
+                  unit={meta.unit}
+                  status={meta.getStatus(latestReadings)}
+                  icon={meta.icon}
+                  sublabel={meta.sublabel}
+                  animate={meta.key === "blood_glucose"}
+                />
+              );
+            })}
           </div>
         </section>
 
-        {/* ── Charts Viewport for PDF Export ──────────────────────────────── */}
-        <div id="curasync-charts-viewport" className="space-y-6 bg-transparent p-1">
-          {/* ── Chart + Adherence ─────────────────────────────────────────── */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div className="lg:col-span-2">
-              <GlucoseChart data={recentReadings} />
-            </div>
-            <div>
-              <AdherenceStreakCard
-                weeklyAdherence={weeklyAdherence}
-                streakDays={streakDays}
-              />
-            </div>
-          </div>
-
-          {/* ── Glucose Daily Log (from Python glucose tracker) ────────── */}
-          <section aria-labelledby="glucose-log-heading">
-            <h2 id="glucose-log-heading" className="font-semibold text-title-md text-text-primary mb-3">
-              🩸 Glucose Daily Log
-            </h2>
-            <GlucoseLogChart entries={getMockGlucoseLog()} />
-          </section>
-        </div>
-
-        {/* ── Medications ──────────────────────────────────────────────────── */}
-        <section aria-labelledby="meds-heading">
-          <h2 id="meds-heading" className="font-semibold text-title-md text-text-primary mb-3">
-            Medications
-          </h2>
+        {/* ── 3. Today's Medications ───────────────────────────────────────── */}
+        <section aria-label="Today's Medications">
           <MedicationCard
             medications={todayMedications}
             onLogDose={logDose}
           />
         </section>
 
-        {/* ── Upcoming reminders strip ─────────────────────────────────────── */}
-        <section aria-labelledby="reminders-heading">
-          <h2 id="reminders-heading" className="font-semibold text-title-md text-text-primary mb-3">
-            Upcoming Doses
-          </h2>
-          <UpcomingRemindersStrip doses={upcomingDoses} onMarkTaken={markUpcomingDoseTaken} />
+        {/* ── 4. Active Alerts (Only rendered when activeAlerts.length > 0) ── */}
+        {alerts.length > 0 && (
+          <section aria-label="Active Alerts">
+            <AlertBanner alerts={alerts} onDismiss={dismissAlert} />
+          </section>
+        )}
+
+        {/* ── 5. Primary Condition Trend Chart ─────────────────────────────── */}
+        <section aria-label="Primary Trend Chart">
+          <GlucoseChart data={recentReadings} targetMin={70} targetMax={180} />
         </section>
 
-        {/* ── Weekly summary ────────────────────────────────────────────────── */}
-        <WeeklySummaryCard {...DEFAULT_WEEKLY_SUMMARY} />
-
-        {/* ── PDF export + calendar link ────────────────────────────────────── */}
-        <div className="flex items-center justify-between gap-3">
-          <Link
-            href="/calendar"
-            className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-divider bg-bg-card text-label-sm font-semibold text-text-secondary hover:text-accent-violet hover:border-accent-lavender transition-all shadow-card"
-          >
-            <CalendarDays size={15} aria-hidden="true" />
-            Health Calendar
-          </Link>
+        {/* ── Optional Collapsible More Section (Hidden on first load) ─────── */}
+        <div className="pt-2">
           <button
-            onClick={handlePdfExport}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-divider bg-bg-card text-label-sm font-semibold text-text-secondary hover:text-accent-violet hover:border-accent-lavender transition-all shadow-card"
+            onClick={() => setShowMoreWidgets((prev) => !prev)}
+            className="flex items-center gap-1.5 text-xs font-semibold text-text-tertiary hover:text-text-primary transition-colors py-2"
+            aria-expanded={showMoreWidgets}
           >
-            <Download size={15} aria-hidden="true" />
-            Export PDF
+            <span>{showMoreWidgets ? "Hide Additional Insights" : "Show More Insights & Summaries"}</span>
+            {showMoreWidgets ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
           </button>
+
+          {showMoreWidgets && (
+            <div className="space-y-6 pt-4 border-t border-divider animate-fade-in">
+              <AdherenceStreakCard
+                weeklyAdherence={weeklyAdherence}
+                streakDays={streakDays}
+              />
+              <UpcomingRemindersStrip
+                doses={upcomingDoses}
+                onMarkTaken={markUpcomingDoseTaken}
+              />
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                {conditionSummaries.map((summary) => (
+                  <ConditionTile key={summary.conditionId} summary={summary} />
+                ))}
+              </div>
+              <WeeklySummaryCard {...DEFAULT_WEEKLY_SUMMARY} />
+            </div>
+          )}
         </div>
 
-        {/* Bottom padding — clears floating FAB */}
-        <div className="h-24" />
+        {/* ── Log Reading Modal ────────────────────────────────────────────── */}
+        <LogReadingModal
+          open={logModalOpen}
+          onClose={() => setLogModalOpen(false)}
+          onSaved={() => refresh()}
+        />
       </div>
-
-      {/* ── Floating Action Button ─────────────────────────────────────────── */}
-      <button
-        onClick={() => setLogModalOpen(true)}
-        className="fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full gradient-violet text-white shadow-2xl flex items-center justify-center hover:scale-110 active:scale-95 transition-transform"
-        aria-label="Log a new reading"
-        style={{ boxShadow: "0 8px 32px rgba(108,92,231,0.45)" }}
-      >
-        <PlusCircle size={26} strokeWidth={2} aria-hidden="true" />
-      </button>
-
-      {/* ── Log Reading Modal ──────────────────────────────────────────────── */}
-      <LogReadingModal
-        open={logModalOpen}
-        onClose={() => setLogModalOpen(false)}
-        onSaved={(type: BiometricType, value: number) => {
-          refresh();
-        }}
-      />
     </AppShell>
   );
 }

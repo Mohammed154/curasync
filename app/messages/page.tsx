@@ -2,7 +2,8 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import AppShell from "@/components/layout/AppShell";
-import { Send, Lock, Stethoscope, User } from "lucide-react";
+import Link from "next/link";
+import { Send, Lock, Stethoscope, User, Video } from "lucide-react";
 import { clsx } from "clsx";
 import { format } from "date-fns";
 
@@ -60,9 +61,18 @@ export default function MessagesPage() {
               <h1 className="font-semibold text-title-md text-text-primary">Dr. Priya Sharma</h1>
               <p className="text-xs text-text-secondary">Internal Medicine · Mumbai Central Hospital</p>
             </div>
-            <div className="ml-auto flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-status-green-bg">
-              <span className="w-1.5 h-1.5 rounded-full bg-status-green" aria-hidden="true" />
-              <span className="text-xs font-medium text-status-green">Active</span>
+            <div className="ml-auto flex items-center gap-2">
+              <Link
+                href="/telehealth"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-status-green hover:opacity-90 text-white text-xs font-bold shadow-sm transition-all active:scale-95"
+              >
+                <Video size={13} aria-hidden="true" />
+                <span>Live Video Call</span>
+              </Link>
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-status-green-bg">
+                <span className="w-1.5 h-1.5 rounded-full bg-status-green" aria-hidden="true" />
+                <span className="text-xs font-medium text-status-green">Active</span>
+              </div>
             </div>
           </div>
           {/* Encryption notice */}

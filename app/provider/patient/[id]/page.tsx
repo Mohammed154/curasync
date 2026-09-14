@@ -7,7 +7,7 @@ import SymptomHeatmap from "@/components/provider/SymptomHeatmap";
 import AlertThresholdCustomizer from "@/components/provider/AlertThresholdCustomizer";
 import { getMockDashboardData, getMockProviderPanel } from "@/lib/mock-data";
 import { conditionColors } from "@/lib/design-tokens";
-import { ArrowLeft, Download, MessageSquare, AlertTriangle, CheckCircle2, Clock, Pill, Activity, FileText, BookOpen, Sliders } from "lucide-react";
+import { ArrowLeft, Download, MessageSquare, AlertTriangle, CheckCircle2, Clock, Pill, Activity, FileText, BookOpen, Sliders, Video } from "lucide-react";
 import Link from "next/link";
 import { clsx } from "clsx";
 import { format, subDays } from "date-fns";
@@ -70,6 +70,13 @@ export default function ProviderPatientDetailPage({ params }: Props) {
                 </p>
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
+                <Link
+                  href="/provider/telehealth"
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-status-green hover:opacity-90 text-white text-label-sm font-bold shadow-card transition-all active:scale-95"
+                >
+                  <Video size={14} aria-hidden="true" />
+                  Video Call
+                </Link>
                 <Link
                   href="/messages"
                   className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-divider bg-bg-card text-label-sm font-semibold text-text-secondary hover:bg-bg-lavender hover:text-accent-violet transition-all shadow-card"

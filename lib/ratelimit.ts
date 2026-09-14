@@ -17,6 +17,7 @@ export const readingLimiter: RatelimitMock = { limiterName: "readings" };
 export const journalLimiter: RatelimitMock = { limiterName: "journal" };
 export const pdfLimiter: RatelimitMock = { limiterName: "pdf" };
 export const aiLimiter: RatelimitMock = { limiterName: "ai" };
+export const medicineAdvisorLimiter: RatelimitMock = { limiterName: "medicine_advisor" };
 export const authLimiter: RatelimitMock = { limiterName: "auth" };
 
 export async function checkRateLimit(

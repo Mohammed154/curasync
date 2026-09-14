@@ -10,7 +10,7 @@ import { clsx } from "clsx";
 interface OnboardMed { id: string; name: string; dosage: string; frequency: string; conditionId: ConditionId; }
 
 const FREQUENCIES = ["Once daily", "Twice daily", "Three times daily", "Every 8 hours", "Weekly", "As needed (PRN)"];
-const CONDITION_IDS: ConditionId[] = ["diabetes_t2", "hypertension", "ckd", "copd", "chf", "cad", "hypothyroidism", "ra", "asthma"];
+const CONDITION_IDS: ConditionId[] = ["diabetes_t2", "hypertension", "ckd", "hypothyroidism", "ra", "asthma"];
 
 const COMMON_MEDS: Record<string, string[]> = {
   diabetes_t2: ["Metformin", "Glipizide", "Januvia", "Jardiance", "Ozempic"],

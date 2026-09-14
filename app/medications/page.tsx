@@ -1,16 +1,16 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import AppShell from "@/components/layout/AppShell";
 import MedicationCard from "@/components/patient/MedicationCard";
 import { getMockDashboardData } from "@/lib/mock-data";
-import { Plus, Clock, CheckCircle2, XCircle, AlertCircle, Pill, X, ChevronDown } from "lucide-react";
+import { Plus, Clock, CheckCircle2, XCircle, AlertCircle, Pill, X, ChevronDown, Check } from "lucide-react";
 import { clsx } from "clsx";
 import { format, subDays } from "date-fns";
 import { conditionColors } from "@/lib/design-tokens";
 import type { TodayMedication, ConditionId } from "@/types";
 
-const CONDITION_IDS: ConditionId[] = ["diabetes_t2", "hypertension", "ckd", "copd", "chf", "cad", "hypothyroidism", "ra", "asthma"];
+const CONDITION_IDS: ConditionId[] = ["diabetes_t2", "hypertension", "ckd", "hypothyroidism", "ra", "asthma"];
 
 interface MedHistory {
   date: string;
@@ -18,7 +18,7 @@ interface MedHistory {
   total: number;
 }
 
-// Generate 30 days of mock adherence history
+// Generate 30 days of adherence history
 const MOCK_HISTORY: MedHistory[] = Array.from({ length: 30 }, (_, i) => {
   const total = 4;
   const taken = Math.floor(Math.random() * (total + 1));
@@ -30,31 +30,108 @@ export default function MedicationsPage() {
   const [meds, setMeds] = useState<TodayMedication[]>(todayMedications);
   const [showAdd, setShowAdd] = useState(false);
   const [tab, setTab] = useState<"today" | "history" | "all">("today");
+  const [isSaving, setIsSaving] = useState(false);
+  const [savedNotification, setSavedNotification] = useState<string | null>(null);
+
+  // Load medications from DB API
+  useEffect(() => {
+    fetch("/api/v1/medications")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json) => {
+        if (json?.data?.length) {
+          const mapped: TodayMedication[] = json.data.map((m: any) => ({
+            id: m.id,
+            name: m.name,
+            dosage: m.dosage,
+            scheduledAt: m.scheduledTimes?.[0] || "08:00",
+            status: m.status || "pending",
+            conditionId: (m.conditionId as ConditionId) || "diabetes_t2",
+          }));
+          setMeds(mapped);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // Add medication form state
   const [newMed, setNewMed] = useState({
-    name: "", dosage: "", frequency: "once_daily",
+    name: "",
+    dosage: "",
+    frequency: "once_daily",
     conditionId: "diabetes_t2" as ConditionId,
     scheduledAt: "08:00",
   });
 
-  const handleLogDose = (id: string, status: TodayMedication["status"]) => {
-    setMeds((prev) => prev.map((m) => m.id === id ? { ...m, status } : m));
+  const handleLogDose = async (id: string, status: TodayMedication["status"]) => {
+    // 1. Optimistic UI update
+    setMeds((prev) => prev.map((m) => (m.id === id ? { ...m, status } : m)));
+
+    // 2. Persist to API
+    try {
+      await fetch("/api/v1/medications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          medicationId: id,
+          status,
+          scheduledAt: new Date().toISOString(),
+        }),
+      });
+      setSavedNotification(`Dose marked as ${status}`);
+      setTimeout(() => setSavedNotification(null), 2500);
+    } catch (err) {
+      console.error("Failed to persist dose log:", err);
+    }
   };
 
-  const handleAddMed = () => {
+  const handleAddMed = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!newMed.name.trim()) return;
-    const med: TodayMedication = {
-      id: crypto.randomUUID(),
+
+    setIsSaving(true);
+    const tempId = crypto.randomUUID();
+
+    const localMed: TodayMedication = {
+      id: tempId,
       name: newMed.name,
       dosage: newMed.dosage,
       scheduledAt: newMed.scheduledAt,
       status: "pending",
       conditionId: newMed.conditionId,
     };
-    setMeds((prev) => [...prev, med]);
-    setNewMed({ name: "", dosage: "", frequency: "once_daily", conditionId: "diabetes_t2", scheduledAt: "08:00" });
-    setShowAdd(false);
+
+    // Optimistic UI update
+    setMeds((prev) => [...prev, localMed]);
+
+    try {
+      const res = await fetch("/api/v1/medications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "create_medication",
+          name: newMed.name,
+          dosage: newMed.dosage,
+          frequency: newMed.frequency,
+          conditionId: newMed.conditionId,
+          scheduledTimes: [newMed.scheduledAt],
+        }),
+      });
+
+      if (res.ok) {
+        const json = await res.json();
+        if (json?.data?.id) {
+          setMeds((prev) => prev.map((m) => (m.id === tempId ? { ...m, id: json.data.id } : m)));
+        }
+        setSavedNotification(`Added ${newMed.name} to prescriptions`);
+        setTimeout(() => setSavedNotification(null), 2500);
+      }
+    } catch (err) {
+      console.error("Failed to save medication:", err);
+    } finally {
+      setIsSaving(false);
+      setNewMed({ name: "", dosage: "", frequency: "once_daily", conditionId: "diabetes_t2", scheduledAt: "08:00" });
+      setShowAdd(false);
+    }
   };
 
   const taken = meds.filter((m) => m.status === "taken").length;
@@ -63,13 +140,14 @@ export default function MedicationsPage() {
 
   return (
     <AppShell>
-      <div className="max-w-3xl mx-auto px-4 lg:px-6 py-6">
+      <div className="max-w-3xl mx-auto px-4 lg:px-6 py-6 space-y-6">
+        
         {/* Header */}
-        <div className="flex items-start justify-between mb-6">
+        <div className="flex items-start justify-between">
           <div>
             <h1 className="font-bold text-display text-text-primary">Medications</h1>
             <p className="text-body-md text-text-secondary mt-1">
-              {meds.length} medications · {weeklyAdherence}% weekly adherence
+              {meds.length} active prescriptions · {weeklyAdherence}% weekly adherence
             </p>
           </div>
           <button
@@ -81,8 +159,15 @@ export default function MedicationsPage() {
           </button>
         </div>
 
+        {savedNotification && (
+          <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-status-green-bg border border-status-green/30 text-status-green text-xs font-semibold animate-fade-in">
+            <Check size={14} />
+            <span>{savedNotification}</span>
+          </div>
+        )}
+
         {/* Stats row */}
-        <div className="grid grid-cols-3 gap-3 mb-6">
+        <div className="grid grid-cols-3 gap-3">
           {[
             { label: "Taken", count: taken, icon: CheckCircle2, color: "#00B894", bg: "#E8F8F5" },
             { label: "Pending", count: pending, icon: Clock, color: "#A29BFE", bg: "#F0EFF8" },
@@ -99,163 +184,172 @@ export default function MedicationsPage() {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 p-1 bg-bg-card rounded-xl shadow-card mb-5">
-          {(["today", "all", "history"] as const).map((t) => (
+        <div className="flex gap-1 p-1 bg-bg-card rounded-xl shadow-card">
+          {(["today", "history", "all"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
               className={clsx(
-                "flex-1 py-2.5 rounded-lg text-label-sm font-semibold transition-all capitalize",
-                tab === t ? "gradient-violet text-white shadow-sm" : "text-text-secondary hover:text-text-primary"
+                "flex-1 py-2 rounded-lg text-label-sm font-semibold capitalize transition-all",
+                tab === t ? "bg-accent-violet text-white shadow-xs" : "text-text-secondary hover:text-text-primary"
               )}
             >
-              {t === "today" ? "Today" : t === "all" ? "All Medications" : "30-Day History"}
+              {t === "today" ? "Today's Schedule" : t === "history" ? "30-Day History" : "All Prescriptions"}
             </button>
           ))}
         </div>
 
-        {/* Add medication form */}
-        {showAdd && (
-          <div className="bg-bg-card rounded-xl shadow-card p-5 mb-5 border border-accent-lavender/30 animate-fade-in">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-title-md text-text-primary">Add Medication</h3>
-              <button onClick={() => setShowAdd(false)} className="p-1.5 rounded-lg hover:bg-bg-lavender text-text-tertiary">
-                <X size={16} aria-label="Close" />
-              </button>
-            </div>
+        {/* TAB 1: Today's medications */}
+        {tab === "today" && (
+          <MedicationCard
+            medications={meds}
+            onLogDose={handleLogDose}
+          />
+        )}
 
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-text-secondary mb-1">Medication name *</label>
-                  <input
-                    value={newMed.name}
-                    onChange={(e) => setNewMed({ ...newMed, name: e.target.value })}
-                    placeholder="e.g., Metformin"
-                    className="w-full px-3 py-2 rounded-lg border border-divider bg-bg-light text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-lavender/40 focus:border-accent-violet"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-text-secondary mb-1">Dosage</label>
-                  <input
-                    value={newMed.dosage}
-                    onChange={(e) => setNewMed({ ...newMed, dosage: e.target.value })}
-                    placeholder="e.g., 500mg"
-                    className="w-full px-3 py-2 rounded-lg border border-divider bg-bg-light text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-lavender/40 focus:border-accent-violet"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-text-secondary mb-1">Condition</label>
-                  <select
-                    value={newMed.conditionId}
-                    onChange={(e) => setNewMed({ ...newMed, conditionId: e.target.value as ConditionId })}
-                    className="w-full px-3 py-2 rounded-lg border border-divider bg-bg-light text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-lavender/40"
+        {/* TAB 2: History heatmap */}
+        {tab === "history" && (
+          <div className="bg-bg-card rounded-xl shadow-card p-5 space-y-4 animate-fade-in">
+            <h2 className="font-semibold text-title-md text-text-primary">30-Day Medication Adherence</h2>
+            <div className="grid grid-cols-6 sm:grid-cols-10 gap-1.5">
+              {MOCK_HISTORY.map((h) => {
+                const pct = h.total > 0 ? (h.taken / h.total) * 100 : 0;
+                const bg =
+                  pct === 100 ? "#00B894" :
+                  pct >= 75   ? "#55EFC4" :
+                  pct >= 50   ? "#FDCB6E" :
+                  pct > 0     ? "#E17055" : "#D63031";
+                return (
+                  <div
+                    key={h.date}
+                    className="aspect-square rounded-lg flex flex-col items-center justify-center text-[10px] text-white font-bold transition-transform hover:scale-110 cursor-default"
+                    style={{ background: bg }}
+                    title={`${h.date}: ${h.taken}/${h.total} taken (${Math.round(pct)}%)`}
                   >
-                    {CONDITION_IDS.map((cId) => (
-                      <option key={cId} value={cId}>
-                        {conditionColors[cId]?.emoji} {conditionColors[cId]?.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-text-secondary mb-1">Time</label>
-                  <input
-                    type="time"
-                    value={newMed.scheduledAt}
-                    onChange={(e) => setNewMed({ ...newMed, scheduledAt: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg border border-divider bg-bg-light text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-lavender/40"
-                  />
-                </div>
-              </div>
-
-              {/* Drug-condition conflict flag */}
-              {newMed.conditionId === "ckd" && newMed.name.toLowerCase().includes("ibuprofen") && (
-                <div className="flex items-start gap-2 p-3 rounded-lg bg-status-red-bg border border-status-red/20">
-                  <AlertCircle size={14} className="text-status-red flex-shrink-0 mt-0.5" />
-                  <p className="text-xs text-status-red font-medium">
-                    ⚠️ NSAIDs like ibuprofen may worsen kidney function in CKD patients. Consult your doctor before taking.
-                  </p>
-                </div>
-              )}
-
-              <button
-                onClick={handleAddMed}
-                disabled={!newMed.name.trim()}
-                className="w-full py-3 rounded-xl gradient-violet text-white font-semibold text-label-sm disabled:opacity-40 hover:opacity-90 transition-opacity"
-              >
-                Add to Schedule
-              </button>
+                    <span>{h.date.split(" ")[1]}</span>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
 
-        {/* Today tab */}
-        {tab === "today" && <MedicationCard medications={meds} onLogDose={handleLogDose} />}
-
-        {/* All medications tab */}
+        {/* TAB 3: All medications list */}
         {tab === "all" && (
-          <div className="bg-bg-card rounded-xl shadow-card overflow-hidden">
-            <div className="px-4 py-3 border-b border-divider flex items-center justify-between">
-              <h3 className="font-semibold text-title-md text-text-primary">All Medications</h3>
-              <span className="text-label-sm text-text-tertiary">{meds.length} total</span>
-            </div>
-            {meds.map((med, i) => {
+          <div className="space-y-3 animate-fade-in">
+            {meds.map((med) => {
               const c = conditionColors[med.conditionId];
               return (
-                <div key={med.id} className={clsx("flex items-center gap-3 px-4 py-3", i < meds.length - 1 && "border-b border-divider")}>
-                  <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: c?.bg }}>
-                    <span className="text-base" aria-hidden="true">{c?.emoji}</span>
+                <div key={med.id} className="bg-bg-card rounded-xl p-4 shadow-card flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg" style={{ background: c?.bg }}>
+                      {c?.emoji}
+                    </div>
+                    <div>
+                      <p className="font-semibold text-title-sm text-text-primary">{med.name}</p>
+                      <p className="text-xs text-text-secondary">{med.dosage} · Scheduled at {med.scheduledAt}</p>
+                      <p className="text-xs text-text-tertiary mt-0.5">{c?.label}</p>
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-label-sm text-text-primary">{med.name} <span className="font-normal text-text-tertiary">{med.dosage}</span></p>
-                    <p className="text-xs text-text-tertiary">{c?.label} · {med.scheduledAt}</p>
-                  </div>
-                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ background: med.status === "taken" ? "#E8F8F5" : med.status === "missed" ? "#FDECEA" : "#F0EFF8" }}>
-                    <span className="text-xs font-semibold capitalize" style={{ color: med.status === "taken" ? "#00B894" : med.status === "missed" ? "#D63031" : "#A29BFE" }}>
-                      {med.status}
-                    </span>
-                  </div>
+                  <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-bg-light text-text-secondary capitalize">
+                    {med.status}
+                  </span>
                 </div>
               );
             })}
           </div>
         )}
 
-        {/* History tab */}
-        {tab === "history" && (
-          <div className="bg-bg-card rounded-xl shadow-card p-5">
-            <h3 className="font-semibold text-title-md text-text-primary mb-4">30-Day Adherence</h3>
-            <div className="flex items-end gap-1 h-24 mb-3">
-              {MOCK_HISTORY.map((d, i) => {
-                const pct = d.total > 0 ? d.taken / d.total : 0;
-                const color = pct >= 0.8 ? "#00B894" : pct >= 0.5 ? "#FDCB6E" : "#D63031";
-                return (
-                  <div key={i} className="flex-1 flex flex-col items-center justify-end gap-0.5" title={`${d.date}: ${d.taken}/${d.total} taken`}>
-                    <div className="w-full rounded-sm" style={{ height: `${Math.max(pct * 80, 4)}px`, background: color, opacity: 0.85 }} />
+        {/* Add Medication Modal */}
+        {showAdd && (
+          <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-bg-card rounded-2xl p-6 w-full max-w-md shadow-2xl space-y-4 animate-fade-in">
+              <div className="flex items-center justify-between border-b border-divider pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg gradient-violet flex items-center justify-center text-white">
+                    <Pill size={16} />
                   </div>
-                );
-              })}
-            </div>
-            <div className="flex justify-between text-xs text-text-tertiary">
-              <span>{MOCK_HISTORY[0]?.date}</span>
-              <span>Today</span>
-            </div>
-            <div className="flex items-center gap-4 mt-4 pt-4 border-t border-divider">
-              {[{ color: "#00B894", label: "≥80% taken" }, { color: "#FDCB6E", label: "50–79%" }, { color: "#D63031", label: "<50%" }].map((l) => (
-                <div key={l.label} className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-sm" style={{ background: l.color }} aria-hidden="true" />
-                  <span className="text-xs text-text-secondary">{l.label}</span>
+                  <h3 className="font-bold text-title-md text-text-primary">Add Prescription</h3>
                 </div>
-              ))}
+                <button
+                  onClick={() => setShowAdd(false)}
+                  className="p-1 rounded-lg text-text-tertiary hover:text-text-primary"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <form onSubmit={handleAddMed} className="space-y-4 text-xs">
+                <div>
+                  <label className="block font-bold text-text-secondary uppercase mb-1">Medication Name *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Metformin, Amlodipine"
+                    value={newMed.name}
+                    onChange={(e) => setNewMed({ ...newMed, name: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-divider bg-bg-light text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-violet"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-bold text-text-secondary uppercase mb-1">Dosage *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. 500mg, 10mg"
+                      value={newMed.dosage}
+                      onChange={(e) => setNewMed({ ...newMed, dosage: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl border border-divider bg-bg-light text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-violet"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-text-secondary uppercase mb-1">Schedule Time</label>
+                    <input
+                      type="time"
+                      value={newMed.scheduledAt}
+                      onChange={(e) => setNewMed({ ...newMed, scheduledAt: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl border border-divider bg-bg-light text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-violet"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-text-secondary uppercase mb-1">Condition Protocol</label>
+                  <select
+                    value={newMed.conditionId}
+                    onChange={(e) => setNewMed({ ...newMed, conditionId: e.target.value as ConditionId })}
+                    className="w-full px-3 py-2 rounded-xl border border-divider bg-bg-light text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-violet"
+                  >
+                    {CONDITION_IDS.map((cId) => (
+                      <option key={cId} value={cId}>
+                        {conditionColors[cId]?.label ?? cId}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowAdd(false)}
+                    className="flex-1 py-2.5 rounded-xl border border-divider font-semibold text-text-secondary hover:bg-bg-light"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSaving}
+                    className="flex-1 py-2.5 rounded-xl gradient-violet text-white font-bold shadow-card hover:opacity-90 disabled:opacity-50"
+                  >
+                    {isSaving ? "Saving…" : "Save Medication"}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}
-
-        <div className="h-8" />
       </div>
     </AppShell>
   );

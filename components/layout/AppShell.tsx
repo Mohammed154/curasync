@@ -7,7 +7,7 @@ import {
   LayoutDashboard, Stethoscope, Pill, BookOpen, Bell,
   Settings, LogOut, Menu, X, Heart, ChevronDown, MapPin,
   MessageSquare, CalendarDays, Watch, UserPlus, Droplets,
-  Check, CheckCheck
+  Check, CheckCheck, Video, FlaskConical
 } from "lucide-react";
 import { clsx } from "clsx";
 import { severityBg, severityColor, severityIcon } from "@/lib/alerts";
@@ -21,22 +21,25 @@ interface NavItem {
 }
 
 const PATIENT_NAV: NavItem[] = [
-  { label: "Dashboard",        href: "/dashboard",   icon: LayoutDashboard },
-  { label: "Conditions",       href: "/conditions",  icon: Heart },
-  { label: "Glucose Tracker",  href: "/glucose",     icon: Droplets },
-  { label: "Medications",      href: "/medications", icon: Pill },
-  { label: "Journal",          href: "/journal",     icon: BookOpen },
-  { label: "Calendar",         href: "/calendar",    icon: CalendarDays },
-  { label: "Wearables",        href: "/wearables",   icon: Watch },
-  { label: "Messages",         href: "/messages",    icon: MessageSquare },
-  { label: "Alerts",           href: "/alerts",      icon: Bell },
+  { label: "Dashboard",        href: "/dashboard",        icon: LayoutDashboard },
+  { label: "Telehealth",       href: "/telehealth",       icon: Video },
+  { label: "Medicine Advisor", href: "/medicine-advisor", icon: FlaskConical },
+  { label: "Conditions",       href: "/conditions",       icon: Heart },
+  { label: "Glucose Tracker",  href: "/glucose",          icon: Droplets },
+  { label: "Medications",      href: "/medications",      icon: Pill },
+  { label: "Journal",          href: "/journal",          icon: BookOpen },
+  { label: "Calendar",         href: "/calendar",         icon: CalendarDays },
+  { label: "Wearables",        href: "/wearables",        icon: Watch },
+  { label: "Messages",         href: "/messages",         icon: MessageSquare },
+  { label: "Alerts",           href: "/alerts",           icon: Bell },
 ];
 
 const PROVIDER_NAV: NavItem[] = [
-  { label: "Patient Panel",  href: "/provider",         icon: Stethoscope },
-  { label: "Invite Patient", href: "/provider/invite",  icon: UserPlus },
-  { label: "Alerts",         href: "/alerts",           icon: Bell },
-  { label: "Settings",       href: "/settings",         icon: Settings },
+  { label: "Patient Panel",  href: "/provider",             icon: Stethoscope },
+  { label: "Telehealth",     href: "/provider/telehealth",  icon: Video },
+  { label: "Invite Patient", href: "/provider/invite",      icon: UserPlus },
+  { label: "Alerts",         href: "/alerts",               icon: Bell },
+  { label: "Settings",       href: "/settings",             icon: Settings },
 ];
 
 interface SafeSignOutButtonProps {
@@ -79,6 +82,7 @@ export default function AppShell({
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [sidebarProfileOpen, setSidebarProfileOpen] = useState(false);
   const [notifications, setNotifications] = useState<Alert[]>([]);
 
   useEffect(() => {
@@ -108,6 +112,7 @@ export default function AppShell({
   // Close popovers on page navigation
   useEffect(() => {
     setProfileOpen(false);
+    setSidebarProfileOpen(false);
     setNotificationsOpen(false);
   }, [pathname]);
 
@@ -127,11 +132,19 @@ export default function AppShell({
         />
       )}
 
+      {/* Click-outside backdrop for sidebar profile popover */}
+      {sidebarProfileOpen && (
+        <div
+          className="fixed inset-0 z-40 cursor-default"
+          onClick={() => setSidebarProfileOpen(false)}
+        />
+      )}
+
       <aside
         className={clsx(
           "fixed top-0 left-0 h-full w-64 bg-bg-card border-r border-divider z-50",
           "flex flex-col transition-transform duration-300 ease-out",
-          "lg:translate-x-0 lg:static lg:z-auto",
+          "lg:translate-x-0 lg:static lg:relative lg:z-50",
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         )}
         style={{ boxShadow: "4px 0 24px rgba(108,92,231,0.06)" }}
@@ -161,14 +174,25 @@ export default function AppShell({
         </div>
 
         {/* User info */}
-        <div className="px-4 py-4 border-b border-divider">
-          <div className="flex items-center gap-3 p-3 rounded-lg bg-bg-lavender">
+        <div className="px-4 py-3 border-b border-divider relative">
+          <button
+            type="button"
+            onClick={() => setSidebarProfileOpen((prev) => !prev)}
+            aria-expanded={sidebarProfileOpen}
+            aria-label="User profile options"
+            className={clsx(
+              "w-full flex items-center gap-3 p-2.5 rounded-xl transition-all duration-150 text-left group cursor-pointer",
+              sidebarProfileOpen
+                ? "bg-bg-lavender ring-2 ring-accent-violet/30 shadow-sm"
+                : "bg-bg-lavender hover:bg-bg-lavender/70 active:scale-[0.98]"
+            )}
+          >
             <div
-              className="w-9 h-9 rounded-full gradient-violet flex items-center justify-center text-white font-semibold text-label-sm flex-shrink-0"
+              className="w-9 h-9 rounded-full gradient-violet flex items-center justify-center text-white font-semibold text-label-sm flex-shrink-0 shadow-sm"
             >
               AM
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="font-semibold text-label-sm text-text-primary truncate">
                 Arjun Mehta
               </p>
@@ -176,8 +200,79 @@ export default function AppShell({
                 {role} · Mumbai
               </p>
             </div>
-            <ChevronDown size={14} className="text-text-tertiary flex-shrink-0 ml-auto" />
-          </div>
+            <ChevronDown
+              size={15}
+              className={clsx(
+                "text-text-tertiary transition-transform duration-200 flex-shrink-0 group-hover:text-accent-violet",
+                sidebarProfileOpen && "rotate-180 text-accent-violet"
+              )}
+            />
+          </button>
+
+          {/* Sidebar Profile Popover / Dropdown Menu */}
+          {sidebarProfileOpen && (
+            <div
+              className="mt-2 p-2 bg-bg-card rounded-xl border border-divider shadow-card animate-fade-in space-y-1"
+              style={{ boxShadow: "0 8px 24px rgba(108,92,231,0.12)" }}
+            >
+              <div className="px-2.5 py-2 border-b border-divider bg-bg-lavender/30 rounded-lg mb-1.5">
+                <p className="text-xs font-bold text-text-primary">Arjun Mehta</p>
+                <p className="text-[11px] text-text-tertiary truncate">arjun.mehta@outlook.com</p>
+                <span className="text-[10px] font-bold text-accent-violet uppercase bg-bg-lavender/60 px-2 py-0.5 rounded-full mt-1.5 inline-block">
+                  {role}
+                </span>
+              </div>
+
+              <Link
+                href="/settings"
+                onClick={() => {
+                  setSidebarProfileOpen(false);
+                  setSidebarOpen(false);
+                }}
+                className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-text-secondary hover:bg-bg-lavender hover:text-text-primary transition-all text-xs font-medium"
+              >
+                <Settings size={15} className="text-text-tertiary" />
+                <span>Profile & Settings</span>
+              </Link>
+
+              <Link
+                href="/conditions"
+                onClick={() => {
+                  setSidebarProfileOpen(false);
+                  setSidebarOpen(false);
+                }}
+                className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-text-secondary hover:bg-bg-lavender hover:text-text-primary transition-all text-xs font-medium"
+              >
+                <Heart size={15} className="text-text-tertiary" />
+                <span>My Conditions</span>
+              </Link>
+
+              <Link
+                href="/wearables"
+                onClick={() => {
+                  setSidebarProfileOpen(false);
+                  setSidebarOpen(false);
+                }}
+                className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-text-secondary hover:bg-bg-lavender hover:text-text-primary transition-all text-xs font-medium"
+              >
+                <Watch size={15} className="text-text-tertiary" />
+                <span>Connected Devices</span>
+              </Link>
+
+              <div className="border-t border-divider pt-1 mt-1">
+                <SafeSignOutButton
+                  onClick={() => {
+                    setSidebarProfileOpen(false);
+                    setSidebarOpen(false);
+                  }}
+                  className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-status-red hover:bg-status-red-bg transition-all text-xs font-semibold"
+                >
+                  <LogOut size={15} />
+                  <span>Sign out</span>
+                </SafeSignOutButton>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Navigation */}

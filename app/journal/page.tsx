@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import AppShell from "@/components/layout/AppShell";
-import { Plus, Mic, BookOpen, TrendingUp, Calendar, ChevronDown, X } from "lucide-react";
+import { Plus, BookOpen, TrendingUp, ChevronDown, X, Check } from "lucide-react";
 import { clsx } from "clsx";
 import { format } from "date-fns";
 import { conditionColors } from "@/lib/design-tokens";
@@ -57,23 +57,79 @@ export default function JournalPage() {
   const [severity, setSeverity] = useState(5);
   const [conditionId, setConditionId] = useState<ConditionId>("diabetes_t2");
   const [bodyLocation, setBodyLocation] = useState("");
-  const [activeSymptom, setActiveSymptom] = useState<string | null>(null);
   const [tab, setTab] = useState<"log" | "trends">("log");
+  const [isSaving, setIsSaving] = useState(false);
+  const [savedNotification, setSavedNotification] = useState<string | null>(null);
 
-  const conditions: ConditionId[] = ["diabetes_t2", "hypertension", "ckd"];
+  // Load entries from DB API
+  useEffect(() => {
+    fetch("/api/v1/journal")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json) => {
+        if (json?.data?.length) {
+          const mapped: SymptomEntry[] = json.data.map((e: any) => ({
+            id: e.id,
+            text: e.text,
+            severity: e.severity,
+            conditionId: (e.conditionId as ConditionId) || "diabetes_t2",
+            bodyLocation: e.bodyLocation || undefined,
+            createdAt: new Date(e.recordedAt || e.createdAt),
+          }));
+          setEntries(mapped);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
-  const handleSubmit = () => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!text.trim()) return;
-    const entry: SymptomEntry = {
-      id: crypto.randomUUID(),
+
+    setIsSaving(true);
+    const tempId = crypto.randomUUID();
+
+    const newEntry: SymptomEntry = {
+      id: tempId,
       text: text.trim(),
       severity,
       conditionId,
       bodyLocation: bodyLocation || undefined,
       createdAt: new Date(),
     };
-    setEntries((prev) => [entry, ...prev]);
-    setText(""); setSeverity(5); setBodyLocation(""); setShowForm(false);
+
+    // 1. Optimistic UI update
+    setEntries((prev) => [newEntry, ...prev]);
+
+    // 2. Persist to API
+    try {
+      const res = await fetch("/api/v1/journal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: text.trim(),
+          severity,
+          conditionId,
+          bodyLocation: bodyLocation || undefined,
+        }),
+      });
+
+      if (res.ok) {
+        const json = await res.json();
+        if (json?.data?.id) {
+          setEntries((prev) => prev.map((item) => (item.id === tempId ? { ...item, id: json.data.id } : item)));
+        }
+        setSavedNotification("Symptom journal entry saved");
+        setTimeout(() => setSavedNotification(null), 2500);
+      }
+    } catch (err) {
+      console.error("Failed to save journal entry:", err);
+    } finally {
+      setIsSaving(false);
+      setText("");
+      setSeverity(5);
+      setBodyLocation("");
+      setShowForm(false);
+    }
   };
 
   const sev = SEVERITY_LABELS[severity] ?? { label: "Moderate", color: "#FDCB6E" };
@@ -86,12 +142,13 @@ export default function JournalPage() {
 
   return (
     <AppShell>
-      <div className="max-w-3xl mx-auto px-4 lg:px-6 py-6">
+      <div className="max-w-3xl mx-auto px-4 lg:px-6 py-6 space-y-6">
+        
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between">
           <div>
             <h1 className="font-bold text-display text-text-primary">Symptom Journal</h1>
-            <p className="text-body-md text-text-secondary mt-1">{entries.length} entries logged</p>
+            <p className="text-body-md text-text-secondary mt-1">{entries.length} entries recorded</p>
           </div>
           <button
             onClick={() => setShowForm(true)}
@@ -102,235 +159,85 @@ export default function JournalPage() {
           </button>
         </div>
 
+        {savedNotification && (
+          <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-status-green-bg border border-status-green/30 text-status-green text-xs font-semibold animate-fade-in">
+            <Check size={14} />
+            <span>{savedNotification}</span>
+          </div>
+        )}
+
         {/* Tabs */}
-        <div className="flex gap-1 p-1 bg-bg-card rounded-xl shadow-card mb-6">
+        <div className="flex gap-1 p-1 bg-bg-card rounded-xl shadow-card">
           {(["log", "trends"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
               className={clsx(
-                "flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-label-sm font-semibold transition-all capitalize",
-                tab === t ? "gradient-violet text-white shadow-sm" : "text-text-secondary hover:text-text-primary"
+                "flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-label-sm font-semibold transition-all capitalize",
+                tab === t ? "bg-accent-violet text-white shadow-xs" : "text-text-secondary hover:text-text-primary"
               )}
             >
               {t === "log" ? <BookOpen size={15} aria-hidden="true" /> : <TrendingUp size={15} aria-hidden="true" />}
-              {t === "log" ? "Journal" : "Trends"}
+              {t === "log" ? "Journal Entries" : "Frequency Trends"}
             </button>
           ))}
         </div>
 
-        {/* Add form */}
-        {showForm && (
-          <div className="bg-bg-card rounded-xl shadow-card p-5 mb-5 border border-accent-lavender/30 animate-fade-in">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-title-md text-text-primary">Log a Symptom</h3>
-              <button onClick={() => setShowForm(false)} className="p-1.5 rounded-lg hover:bg-bg-lavender text-text-tertiary" aria-label="Close form">
-                <X size={16} />
-              </button>
-            </div>
-
-            {/* Condition selector */}
-            <div className="mb-4">
-              <label className="block text-label-sm font-semibold text-text-secondary mb-2">Condition</label>
-              <div className="flex flex-wrap gap-2">
-                {conditions.map((cId) => {
-                  const c = conditionColors[cId];
-                  return (
-                    <button
-                      key={cId}
-                      onClick={() => setConditionId(cId)}
-                      className={clsx("px-3 py-1.5 rounded-full text-label-sm font-semibold transition-all border-2")}
-                      style={{
-                        background: conditionId === cId ? c?.bg : "transparent",
-                        color: conditionId === cId ? c?.accent : "#8888A8",
-                        borderColor: conditionId === cId ? (c?.accent ?? "#6C5CE7") : "#E2E0F0",
-                      }}
-                      aria-pressed={conditionId === cId}
-                    >
-                      {c?.emoji} {c?.label.split(" ").slice(0,2).join(" ")}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Quick pick symptoms */}
-            {CONDITION_SYMPTOMS[conditionId] && (
-              <div className="mb-4">
-                <label className="block text-label-sm font-semibold text-text-secondary mb-2">Common symptoms — tap to add</label>
-                <div className="flex flex-wrap gap-1.5">
-                  {CONDITION_SYMPTOMS[conditionId]?.map((s) => (
-                    <button
-                      key={s}
-                      onClick={() => setText((prev) => prev ? `${prev}, ${s}` : s)}
-                      className={clsx(
-                        "px-2.5 py-1 rounded-full text-xs font-medium transition-all border",
-                        activeSymptom === s
-                          ? "bg-accent-violet text-white border-accent-violet"
-                          : "bg-bg-lavender text-text-secondary border-divider hover:border-accent-lavender"
-                      )}
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Free text */}
-            <div className="mb-4">
-              <label className="block text-label-sm font-semibold text-text-secondary mb-2">Description</label>
-              <textarea
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                placeholder="Describe your symptom in your own words…"
-                rows={3}
-                className="w-full px-3 py-2.5 rounded-lg border border-divider bg-bg-light text-text-primary text-sm focus:outline-none focus:ring-2 focus:ring-accent-lavender/40 focus:border-accent-violet resize-none transition-all"
-                aria-label="Symptom description"
-              />
-            </div>
-
-            {/* Severity slider */}
-            <div className="mb-4">
-              <div className="flex items-center justify-between mb-2">
-                <label className="text-label-sm font-semibold text-text-secondary">Severity</label>
-                <span className="text-label-sm font-bold" style={{ color: sev.color }}>
-                  {severity}/10 — {sev.label}
-                </span>
-              </div>
-              <input
-                type="range" min={1} max={10} value={severity}
-                onChange={(e) => setSeverity(parseInt(e.target.value))}
-                className="w-full h-2 rounded-full appearance-none cursor-pointer"
-                style={{ accentColor: sev.color }}
-                aria-label={`Severity: ${severity} out of 10`}
-              />
-              <div className="flex justify-between text-xs text-text-tertiary mt-1">
-                <span>Minimal</span><span>Severe</span>
-              </div>
-            </div>
-
-            {/* Body location */}
-            <div className="mb-5">
-              <label className="block text-label-sm font-semibold text-text-secondary mb-2">Body location (optional)</label>
-              <div className="flex flex-wrap gap-1.5">
-                {BODY_LOCATIONS.map((loc) => (
-                  <button
-                    key={loc}
-                    onClick={() => setBodyLocation((prev) => prev === loc ? "" : loc)}
-                    className={clsx(
-                      "px-2.5 py-1 rounded-full text-xs font-medium border transition-all",
-                      bodyLocation === loc
-                        ? "bg-accent-violet text-white border-accent-violet"
-                        : "border-divider text-text-secondary hover:border-accent-lavender"
-                    )}
-                    aria-pressed={bodyLocation === loc}
-                  >
-                    {loc}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <button
-              onClick={handleSubmit}
-              disabled={!text.trim()}
-              className="w-full py-3 rounded-xl gradient-violet text-white font-semibold text-label-sm disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
-            >
-              Save Symptom Entry
-            </button>
-          </div>
-        )}
-
-        {/* Journal tab */}
+        {/* LOG TAB */}
         {tab === "log" && (
-          <div className="space-y-3">
-            {entries.length === 0 && (
-              <div className="text-center py-16 text-text-tertiary">
-                <BookOpen size={40} className="mx-auto mb-3 opacity-30" />
-                <p className="text-label-sm">No symptoms logged yet.</p>
-                <p className="text-xs mt-1">Tap &ldquo;Log Symptom&rdquo; to add your first entry.</p>
+          <div className="space-y-4 animate-fade-in">
+            {entries.length === 0 ? (
+              <div className="bg-bg-card rounded-xl p-8 shadow-card text-center text-text-tertiary">
+                No symptoms logged yet. Click &quot;Log Symptom&quot; to add your first entry.
               </div>
-            )}
-            {entries.map((entry) => {
-              const c = conditionColors[entry.conditionId];
-              const s = SEVERITY_LABELS[entry.severity] ?? { label: "Moderate", color: "#FDCB6E" };
-              return (
-                <div key={entry.id} className="bg-bg-card rounded-xl p-4 shadow-card card-enter border border-divider">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                        <span
-                          className="px-2 py-0.5 rounded-full text-xs font-semibold"
-                          style={{ background: c?.bg, color: c?.accent }}
-                        >
-                          {c?.emoji} {c?.label.split(" ").slice(0,2).join(" ")}
+            ) : (
+              entries.map((entry) => {
+                const c = conditionColors[entry.conditionId];
+                const s = SEVERITY_LABELS[entry.severity] ?? { label: "Moderate", color: "#FDCB6E" };
+
+                return (
+                  <div key={entry.id} className="bg-bg-card rounded-xl p-4 shadow-card space-y-2 card-enter">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-base" aria-hidden="true">{c?.emoji}</span>
+                        <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: c?.bg, color: c?.accent }}>
+                          {c?.label}
                         </span>
                         {entry.bodyLocation && (
-                          <span className="text-xs text-text-tertiary bg-bg-light px-2 py-0.5 rounded-full">
-                            📍 {entry.bodyLocation}
-                          </span>
+                          <span className="text-xs text-text-tertiary font-medium">· {entry.bodyLocation}</span>
                         )}
                       </div>
-                      <p className="text-text-primary text-sm leading-snug">{entry.text}</p>
-                      <p className="text-xs text-text-tertiary mt-1.5">
-                        {format(entry.createdAt, "MMM d, h:mm a")}
-                      </p>
+                      <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-bold" style={{ color: s.color, background: s.color + "18" }}>
+                        <span>Severity: {entry.severity}/10</span>
+                      </div>
                     </div>
-                    <div className="flex flex-col items-end flex-shrink-0">
-                      <span className="text-xl font-bold metric-value" style={{ color: s.color }}>
-                        {entry.severity}
-                      </span>
-                      <span className="text-xs" style={{ color: s.color }}>{s.label}</span>
-                    </div>
+
+                    <p className="text-sm text-text-primary font-medium">{entry.text}</p>
+                    <p className="text-[11px] text-text-tertiary">{format(entry.createdAt, "EEEE, MMM d, yyyy · h:mm a")}</p>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
         )}
 
-        {/* Trends tab */}
+        {/* TRENDS TAB */}
         {tab === "trends" && (
-          <div className="space-y-4">
-            <div className="bg-bg-card rounded-xl p-5 shadow-card">
-              <h3 className="font-semibold text-title-md text-text-primary mb-4">Frequency by Condition</h3>
-              <div className="space-y-3">
-                {Object.entries(freqMap).map(([cId, count]) => {
-                  const c = conditionColors[cId];
-                  const pct = Math.round((count / entries.length) * 100);
-                  return (
-                    <div key={cId}>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-label-sm font-semibold text-text-primary">
-                          {c?.emoji} {c?.label}
-                        </span>
-                        <span className="text-label-sm text-text-tertiary">{count} entries</span>
-                      </div>
-                      <div className="h-2 bg-divider rounded-full overflow-hidden">
-                        <div
-                          className="h-full rounded-full transition-all duration-700"
-                          style={{ width: `${pct}%`, background: c?.accent }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="bg-bg-card rounded-xl p-5 shadow-card">
-              <h3 className="font-semibold text-title-md text-text-primary mb-4">Average Severity</h3>
-              {conditions.map((cId) => {
-                const condEntries = entries.filter((e) => e.conditionId === cId);
-                if (!condEntries.length) return null;
-                const avg = Math.round(condEntries.reduce((s, e) => s + e.severity, 0) / condEntries.length);
-                const s = SEVERITY_LABELS[avg] ?? { label: "Moderate", color: "#FDCB6E" };
-                const c = conditionColors[cId];
+          <div className="bg-bg-card rounded-xl p-5 shadow-card space-y-4 animate-fade-in">
+            <h2 className="font-bold text-title-md text-text-primary">Symptom Distribution by Condition</h2>
+            <div className="space-y-3">
+              {Object.entries(freqMap).map(([cId, count]) => {
+                const c = conditionColors[cId as ConditionId];
+                const pct = Math.round((count / entries.length) * 100);
                 return (
-                  <div key={cId} className="flex items-center justify-between py-2 border-b border-divider last:border-0">
-                    <span className="text-label-sm font-semibold text-text-primary">{c?.emoji} {c?.label}</span>
-                    <span className="text-label-sm font-bold" style={{ color: s.color }}>{avg}/10 — {s.label}</span>
+                  <div key={cId} className="space-y-1">
+                    <div className="flex justify-between text-xs font-semibold text-text-primary">
+                      <span>{c?.emoji} {c?.label ?? cId}</span>
+                      <span>{count} entries ({pct}%)</span>
+                    </div>
+                    <div className="h-2 bg-bg-light rounded-full overflow-hidden">
+                      <div className="h-full rounded-full" style={{ width: `${pct}%`, background: c?.accent ?? "#6C5CE7" }} />
+                    </div>
                   </div>
                 );
               })}
@@ -338,7 +245,120 @@ export default function JournalPage() {
           </div>
         )}
 
-        <div className="h-8" />
+        {/* Log Symptom Modal Form */}
+        {showForm && (
+          <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-bg-card rounded-2xl p-6 w-full max-w-md shadow-2xl space-y-4 animate-fade-in">
+              <div className="flex items-center justify-between border-b border-divider pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg gradient-violet flex items-center justify-center text-white">
+                    <BookOpen size={16} />
+                  </div>
+                  <h3 className="font-bold text-title-md text-text-primary">Log Symptom</h3>
+                </div>
+                <button
+                  onClick={() => setShowForm(false)}
+                  className="p-1 rounded-lg text-text-tertiary hover:text-text-primary"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+                <div>
+                  <label className="block font-bold text-text-secondary uppercase mb-1">Related Condition</label>
+                  <select
+                    value={conditionId}
+                    onChange={(e) => setConditionId(e.target.value as ConditionId)}
+                    className="w-full px-3 py-2 rounded-xl border border-divider bg-bg-light text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-violet"
+                  >
+                    {Object.keys(CONDITION_SYMPTOMS).map((cId) => (
+                      <option key={cId} value={cId}>
+                        {conditionColors[cId as ConditionId]?.label ?? cId}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-text-secondary uppercase mb-1">Quick Select Symptoms</label>
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {(CONDITION_SYMPTOMS[conditionId] ?? []).map((s) => (
+                      <button
+                        type="button"
+                        key={s}
+                        onClick={() => setText((prev) => (prev ? `${prev}, ${s}` : s))}
+                        className="px-2 py-1 rounded-lg text-[11px] font-semibold bg-bg-light hover:bg-bg-lavender text-text-secondary border border-divider"
+                      >
+                        + {s}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-text-secondary uppercase mb-1">Description / Notes *</label>
+                  <textarea
+                    rows={3}
+                    required
+                    placeholder="Describe how you feel, triggers, or timing..."
+                    value={text}
+                    onChange={(e) => setText(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-divider bg-bg-light text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-violet resize-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-text-secondary uppercase mb-1">Body Location (Optional)</label>
+                  <select
+                    value={bodyLocation}
+                    onChange={(e) => setBodyLocation(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-divider bg-bg-light text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-violet"
+                  >
+                    <option value="">Select location...</option>
+                    {BODY_LOCATIONS.map((loc) => (
+                      <option key={loc} value={loc}>{loc}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <div className="flex justify-between mb-1">
+                    <label className="font-bold text-text-secondary uppercase">Severity Scale</label>
+                    <span className="font-bold" style={{ color: sev.color }}>
+                      {severity}/10 — {sev.label}
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={1}
+                    max={10}
+                    value={severity}
+                    onChange={(e) => setSeverity(Number(e.target.value))}
+                    className="w-full accent-accent-violet"
+                  />
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowForm(false)}
+                    className="flex-1 py-2.5 rounded-xl border border-divider font-semibold text-text-secondary hover:bg-bg-light"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSaving}
+                    className="flex-1 py-2.5 rounded-xl gradient-violet text-white font-bold shadow-card hover:opacity-90 disabled:opacity-50"
+                  >
+                    {isSaving ? "Saving…" : "Save Entry"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
     </AppShell>
   );

@@ -6,29 +6,26 @@ import Aurora from "@/components/ui/Aurora";
 import {
   Heart, Activity, Pill, MessageSquare, Brain,
   Watch, Shield, ChevronRight, CheckCircle2,
-  ArrowRight, Zap, BarChart3, Bell,
+  ArrowRight, Zap, BarChart3, Bell, Video,
 } from "lucide-react";
 import { clsx } from "clsx";
 
 const FEATURES = [
-  { icon: Activity,    title: "Live Health Monitoring",  description: "Real-time biometric tracking from wearables and manual entry. Blood glucose, BP, heart rate — all in one dashboard.", color: "#00CEC9", bg: "#E6FAF9" },
-  { icon: Brain,       title: "AI Doctor",               description: "Get instant, plain-language explanations of your readings and personalised questions to ask your care team.", color: "#6C5CE7", bg: "#F0EFF8" },
+  { icon: Activity,    title: "Live Health Monitoring",  description: "Real-time biometric tracking from wearables and manual entry. Blood glucose, BP, SpO₂ — all in one dashboard.", color: "#00CEC9", bg: "#E6FAF9" },
+  { icon: Video,       title: "Live Video Consultations", description: "Encrypted HD telehealth video rooms. Connect with your specialist or care team right from the browser.", color: "#6C5CE7", bg: "#F0EFF8" },
+  { icon: Brain,       title: "AI Doctor",               description: "Get instant, plain-language explanations of your readings and personalised questions to ask your care team.", color: "#A29BFE", bg: "#F0EFF8" },
   { icon: Pill,        title: "Medication Management",   description: "Never miss a dose. Smart reminders, adherence tracking, and drug-condition conflict alerts built in.", color: "#E84393", bg: "#FFF0F7" },
   { icon: BarChart3,   title: "Glucose Tracker",         description: "Log fasting, pre-meal, post-meal and bedtime readings with context-aware status and trend charts.", color: "#F39C12", bg: "#FEF9E7" },
   { icon: MessageSquare, title: "Secure Messaging",      description: "Secure direct messaging with your care team. Get clinical feedback without a visit.", color: "#00B894", bg: "#E8F8F5" },
-  { icon: Watch,       title: "Wearable Sync",           description: "Automatic sync with Apple Watch, Fitbit, and Garmin. Data flows in — you focus on getting better.", color: "#A29BFE", bg: "#F0EFF8" },
 ];
 
 const CONDITIONS = [
   { emoji: "🩸", label: "Diabetes"        },
   { emoji: "💉", label: "Hypertension"    },
   { emoji: "🫘", label: "CKD"             },
-  { emoji: "🫁", label: "COPD"            },
-  { emoji: "❤️", label: "Heart Failure"  },
   { emoji: "🦴", label: "Rheumatoid Arthritis" },
   { emoji: "🦋", label: "Hypothyroidism" },
   { emoji: "💨", label: "Asthma"          },
-  { emoji: "🫀", label: "Coronary Artery Disease" },
 ];
 
 const STATS = [
@@ -417,8 +414,8 @@ export default function HomePage() {
             <p style={{ fontSize: 10, fontWeight: 600, color: "rgba(255,255,255,0.35)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 16 }}>Patient Panel · Live</p>
             {[
               { name: "Arjun Mehta",  tags: "🩸 T2D · 💉 HTN · 🫘 CKD", adh: 87, status: "amber" },
-              { name: "Priya Sharma", tags: "💉 HTN · ❤️ CHF",           adh: 64, status: "red"   },
-              { name: "Rajesh Patel", tags: "🩸 T2D · 🫀 CAD",           adh: 96, status: "green" },
+              { name: "Priya Sharma", tags: "💉 HTN · 💨 Asthma",       adh: 64, status: "red"   },
+              { name: "Rajesh Patel", tags: "🩸 T2D · 🦋 Hypothyroidism", adh: 96, status: "green" },
               { name: "Kavita Nair",  tags: "🦴 RA · 💉 HTN",            adh: 98, status: "green" },
             ].map((p, i, arr) => {
               const sc = p.status === "red" ? "#D63031" : p.status === "amber" ? "#F39C12" : "#00B894";
@@ -567,7 +564,7 @@ export default function HomePage() {
                 <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                   <div>
                     <h4 style={{ color: "#fff", fontWeight: 600, marginBottom: 6 }}>1. Information We Collect</h4>
-                    <p style={{ margin: 0 }}>We collect health metrics (such as blood glucose, blood pressure, heart rate), medication logs, and device data synced from Apple Watch, Fitbit, or Garmin, solely to display them on your dashboard.</p>
+                    <p style={{ margin: 0 }}>We collect health metrics (such as blood glucose, blood pressure, oxygen levels), medication logs, and device data synced from Apple Watch, Fitbit, or Garmin, solely to display them on your dashboard.</p>
                   </div>
                   <div>
                     <h4 style={{ color: "#fff", fontWeight: 600, marginBottom: 6 }}>2. Data Security & Storage</h4>

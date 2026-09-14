@@ -107,14 +107,14 @@ const CONDITION_METRICS: Record<string, {
     chartLabel: "DAS28 score trend (6 months)",
   },
   asthma: {
-    primary: { label: "Peak Flow", value: "82", unit: "%", status: "green" },
+    primary: { label: "SpO₂", value: "98", unit: "%", status: "green" },
     secondary: [
       { label: "Rescue inhaler use", value: "1", unit: "/week" },
       { label: "Control test score", value: "22", unit: "/25" },
       { label: "Trigger events", value: "0", unit: "this week" },
       { label: "Last checkup", value: "May 05", unit: "" },
     ],
-    chartLabel: "7-day peak flow trend",
+    chartLabel: "7-day blood oxygen (SpO₂) trend",
   },
 };
 

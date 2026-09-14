@@ -1,13 +1,13 @@
 "use client";
 
-import React from "react";
-import { Check, Clock, AlertCircle } from "lucide-react";
+import React, { useState } from "react";
+import { Check, Clock, AlertCircle, Loader2, Pill } from "lucide-react";
 import type { TodayMedication } from "@/types";
 import { conditionColors } from "@/lib/design-tokens";
 
 interface MedicationCardProps {
   readonly medications: TodayMedication[];
-  readonly onLogDose?: (id: string, status: TodayMedication["status"]) => void;
+  readonly onLogDose?: (id: string, status: TodayMedication["status"]) => void | Promise<void>;
 }
 
 const STATUS_CONFIG = {
@@ -20,10 +20,22 @@ export default function MedicationCard({
   medications,
   onLogDose,
 }: MedicationCardProps) {
+  const [loggingId, setLoggingId] = useState<string | null>(null);
+
   const taken = medications.filter((m) => m.status === "taken").length;
   const total = medications.length;
   const pct = total > 0 ? Math.round((taken / total) * 100) : 0;
   const progressColor = pct >= 80 ? "#00B894" : pct >= 50 ? "#FDCB6E" : "#D63031";
+
+  const handleLog = async (id: string, status: TodayMedication["status"]) => {
+    if (!onLogDose || loggingId) return;
+    setLoggingId(id);
+    try {
+      await Promise.resolve(onLogDose(id, status));
+    } finally {
+      setLoggingId(null);
+    }
+  };
 
   return (
     <div className="bg-bg-card rounded-lg p-4 shadow-card card-enter">
@@ -48,63 +60,77 @@ export default function MedicationCard({
         </div>
       </div>
 
-      {/* Medication list */}
-      <ul className="space-y-2">
-        {medications.map((med) => {
-          const cfg = STATUS_CONFIG[med.status];
-          const StatusIcon = cfg.icon;
-          const condColor = conditionColors[med.conditionId];
+      {/* Medication list or empty state */}
+      {medications.length === 0 ? (
+        <div className="py-6 flex flex-col items-center justify-center text-center gap-2 text-text-tertiary">
+          <Pill size={24} className="opacity-40" />
+          <p className="text-xs">No medications scheduled for today.</p>
+        </div>
+      ) : (
+        <ul className="space-y-2">
+          {medications.map((med) => {
+            const cfg = STATUS_CONFIG[med.status] || STATUS_CONFIG.pending;
+            const StatusIcon = cfg.icon;
+            const condColor = conditionColors[med.conditionId];
+            const isLogging = loggingId === med.id;
 
-          return (
-            <li
-              key={med.id}
-              className="flex items-center gap-3 py-2 border-b border-divider last:border-0"
-            >
-              {/* Condition colour indicator */}
-              <div
-                className="w-1.5 h-8 rounded-full flex-shrink-0"
-                style={{ background: condColor?.accent ?? "#A29BFE" }}
-                aria-hidden="true"
-              />
-
-              {/* Name + time */}
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-label-sm text-text-primary truncate">
-                  {med.name}{" "}
-                  <span className="font-normal text-text-tertiary">{med.dosage}</span>
-                </p>
-                <p className="text-xs text-text-tertiary">{med.scheduledAt}</p>
-              </div>
-
-              {/* Status badge */}
-              <div
-                className="flex items-center gap-1 px-2 py-1 rounded-full flex-shrink-0"
-                style={{ background: cfg.bg }}
+            return (
+              <li
+                key={med.id}
+                className="flex items-center gap-3 py-2 border-b border-divider last:border-0"
               >
-                <StatusIcon
-                  size={12}
-                  style={{ color: cfg.color }}
-                  strokeWidth={2.5}
+                {/* Condition colour indicator */}
+                <div
+                  className="w-1.5 h-8 rounded-full flex-shrink-0"
+                  style={{ background: condColor?.accent ?? "#A29BFE" }}
                   aria-hidden="true"
                 />
-                <span className="text-xs font-semibold" style={{ color: cfg.color }}>
-                  {cfg.label}
-                </span>
-              </div>
 
-              {/* Log button for pending */}
-              {med.status === "pending" && onLogDose && (
-                <button
-                  onClick={() => onLogDose(med.id, "taken")}
-                  className="text-xs font-semibold text-accent-violet hover:text-accent-lavender transition-colors px-2 py-1 rounded-lg hover:bg-bg-lavender flex-shrink-0"
-                  aria-label={`Mark ${med.name} as taken`}
+                {/* Name + time */}
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-label-sm text-text-primary truncate">
+                    {med.name}{" "}
+                    <span className="font-normal text-text-tertiary">{med.dosage}</span>
+                  </p>
+                  <p className="text-xs text-text-tertiary">{med.scheduledAt}</p>
+                </div>
+
+                {/* Status badge */}
+                <div
+                  className="flex items-center gap-1 px-2 py-1 rounded-full flex-shrink-0"
+                  style={{ background: cfg.bg }}
                 >
-                  Mark taken
-                </button>
-              )}            </li>
-          );
-        })}
-      </ul>
+                  <StatusIcon
+                    size={12}
+                    style={{ color: cfg.color }}
+                    strokeWidth={2.5}
+                    aria-hidden="true"
+                  />
+                  <span className="text-xs font-semibold" style={{ color: cfg.color }}>
+                    {cfg.label}
+                  </span>
+                </div>
+
+                {/* Log button for pending */}
+                {med.status === "pending" && onLogDose && (
+                  <button
+                    onClick={() => handleLog(med.id, "taken")}
+                    disabled={isLogging}
+                    className="text-xs font-semibold text-accent-violet hover:text-accent-lavender transition-colors px-2 py-1 rounded-lg hover:bg-bg-lavender flex-shrink-0 flex items-center gap-1 disabled:opacity-50"
+                    aria-label={`Mark ${med.name} as taken`}
+                  >
+                    {isLogging ? (
+                      <Loader2 size={12} className="animate-spin text-accent-violet" />
+                    ) : (
+                      "Mark taken"
+                    )}
+                  </button>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </div>
   );
 }

@@ -11,79 +11,196 @@ import WeeklySummaryCard, { DEFAULT_WEEKLY_SUMMARY } from "@/components/dashboar
 import UpcomingRemindersStrip, { MOCK_UPCOMING_DOSES } from "@/components/dashboard/UpcomingRemindersStrip";
 import AdherenceStreakCard from "@/components/patient/AdherenceStreakCard";
 import ConditionTile from "@/components/patient/ConditionTile";
-import { getMockDashboardData, getStreamedReading } from "@/lib/mock-data";
+import { getMockDashboardData } from "@/lib/mock-data";
 import { getRelevantVitalKeysForConditions, VITAL_METADATA } from "@/lib/condition-vitals-map";
-import type { DashboardData, Alert, TodayMedication } from "@/types";
+import { useReadings, useAlerts, useMedications, patchAlert, logDose as apiLogDose } from "@/hooks/useApi";
+import type { DashboardData, Alert, TodayMedication, ConditionId, SparklinePoint, LatestReadings } from "@/types";
 import { format } from "date-fns";
 import Link from "next/link";
 import { RefreshCw, PlusCircle, ChevronDown, ChevronUp, Video } from "lucide-react";
 
 export default function DashboardPage() {
-  const [data, setData] = useState<DashboardData>(() => getMockDashboardData());
-  const [alerts, setAlerts] = useState<Alert[]>(() => getMockDashboardData().activeAlerts);
+  const initialMock = useMemo(() => getMockDashboardData(), []);
+
+  // ── SWR Live Data Hooks ──────────────────────────────────────────────────
+  const { data: readingsData, mutate: mutateReadings, isValidating: isReadingsValidating } = useReadings(undefined, 100);
+  const { data: alertsData, mutate: mutateAlerts } = useAlerts("active");
+  const { data: medicationsData, mutate: mutateMeds } = useMedications();
+
+  // Local optimistic overrides
+  const [dismissedAlertIds, setDismissedAlertIds] = useState<Set<string>>(() => new Set());
+  const [localMedStatuses, setLocalMedStatuses] = useState<Record<string, TodayMedication["status"]>>({});
   const [upcomingDoses, setUpcomingDoses] = useState(() => MOCK_UPCOMING_DOSES);
   const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [logModalOpen, setLogModalOpen] = useState(false);
   const [showMoreWidgets, setShowMoreWidgets] = useState(false);
 
-  const markUpcomingDoseTaken = (doseId: string) => {
-    const dose = upcomingDoses.find((d) => d.id === doseId);
-    if (dose) {
-      setData((prev) => ({
-        ...prev,
-        todayMedications: prev.todayMedications.map((m) =>
-          m.name.toLowerCase() === dose.medicationName.toLowerCase()
-            ? { ...m, status: "taken" }
-            : m
-        ),
+  // ── Derive Live Biometrics from DB Readings with Fallbacks ───────────────
+  const latestReadings: LatestReadings = useMemo(() => {
+    const base = { ...initialMock.latestReadings };
+    if (!readingsData || readingsData.length === 0) return base;
+
+    for (const r of readingsData) {
+      const numVal = parseFloat(r.value);
+      if (isNaN(numVal)) continue;
+
+      switch (r.type) {
+        case "blood_glucose":
+          if (base.bloodGlucose === initialMock.latestReadings.bloodGlucose) {
+            base.bloodGlucose = Math.round(numVal);
+          }
+          break;
+        case "blood_pressure_systolic":
+          if (base.systolic === initialMock.latestReadings.systolic) {
+            base.systolic = Math.round(numVal);
+          }
+          break;
+        case "blood_pressure_diastolic":
+          if (base.diastolic === initialMock.latestReadings.diastolic) {
+            base.diastolic = Math.round(numVal);
+          }
+          break;
+        case "heart_rate":
+          if (base.heartRate === initialMock.latestReadings.heartRate) {
+            base.heartRate = Math.round(numVal);
+          }
+          break;
+        case "spo2":
+          if (base.spo2 === initialMock.latestReadings.spo2) {
+            base.spo2 = Math.round(numVal);
+          }
+          break;
+        case "weight":
+          if (base.weight === initialMock.latestReadings.weight) {
+            base.weight = parseFloat(numVal.toFixed(1));
+          }
+          break;
+      }
+    }
+
+    base.lastSyncedAt = readingsData[0]?.recordedAt || base.lastSyncedAt;
+    return base;
+  }, [readingsData, initialMock.latestReadings]);
+
+  // ── Derive Primary Condition Sparkline Points from DB Readings ───────────
+  const recentReadings: SparklinePoint[] = useMemo(() => {
+    if (!readingsData || readingsData.length === 0) {
+      return initialMock.recentReadings;
+    }
+
+    const glucoseReadings = readingsData
+      .filter((r) => r.type === "blood_glucose")
+      .slice(0, 12)
+      .reverse();
+
+    if (glucoseReadings.length < 2) {
+      return initialMock.recentReadings;
+    }
+
+    return glucoseReadings.map((r) => ({
+      time: format(new Date(r.recordedAt), "h a"),
+      value: Math.round(parseFloat(r.value)),
+    }));
+  }, [readingsData, initialMock.recentReadings]);
+
+  // ── Derive Today's Medications from DB or Mock ───────────────────────────
+  const todayMedications: TodayMedication[] = useMemo(() => {
+    let sourceList: TodayMedication[] = [];
+
+    if (medicationsData && medicationsData.length > 0) {
+      sourceList = medicationsData.map((m: any) => ({
+        id: m.id,
+        name: m.name,
+        dosage: m.dosage,
+        scheduledAt: m.scheduledTimes?.[0] || "08:00",
+        status: (m.status as TodayMedication["status"]) || "pending",
+        conditionId: (m.conditionId as ConditionId) || "diabetes_t2",
       }));
-      setUpcomingDoses((prev) => prev.filter((d) => d.id !== doseId));
+    } else {
+      sourceList = initialMock.todayMedications;
+    }
+
+    // Apply local optimistic overrides
+    return sourceList.map((med) => {
+      const localStatus = localMedStatuses[med.id];
+      return localStatus ? { ...med, status: localStatus } : med;
+    });
+  }, [medicationsData, localMedStatuses, initialMock.todayMedications]);
+
+  // ── Active Alerts with Dismiss Filter ────────────────────────────────────
+  const activeAlerts: Alert[] = useMemo(() => {
+    const rawList = alertsData ?? initialMock.activeAlerts;
+    return rawList.filter((a) => !dismissedAlertIds.has(a.id));
+  }, [alertsData, dismissedAlertIds, initialMock.activeAlerts]);
+
+  // ── Manual & Background Refresh ─────────────────────────────────────────
+  const refresh = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      await Promise.allSettled([
+        mutateReadings(),
+        mutateAlerts(),
+        mutateMeds(),
+      ]);
+      setLastRefreshed(new Date());
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [mutateReadings, mutateAlerts, mutateMeds]);
+
+  // ── Alert dismiss with API persistence ──────────────────────────────────
+  const dismissAlert = async (id: string) => {
+    setDismissedAlertIds((prev) => new Set([...prev, id]));
+    try {
+      await patchAlert(id, "dismiss");
+      await mutateAlerts();
+    } catch (err) {
+      console.error("[dashboard] Error dismissing alert:", err);
     }
   };
 
-  // ── Simulate real-time streaming (8-second refresh) ──────────────────────
-  const refresh = useCallback(() => {
-    setIsRefreshing(true);
-    setTimeout(() => {
-      setData((prev) => ({
-        ...prev,
-        latestReadings: {
-          ...prev.latestReadings,
-          bloodGlucose:  getStreamedReading(142, 18),
-          heartRate:     getStreamedReading(74,  8),
-          systolic:      getStreamedReading(138, 10),
-          diastolic:     getStreamedReading(88,  6),
-          spo2:          getStreamedReading(97,  2),
-          lastSyncedAt:  new Date().toISOString(),
-        },
-      }));
-      setLastRefreshed(new Date());
-      setIsRefreshing(false);
-    }, 600);
-  }, []);
+  // ── Log dose with API persistence ───────────────────────────────────────
+  const logDose = async (medId: string, status: TodayMedication["status"]) => {
+    // 1. Optimistic local update
+    setLocalMedStatuses((prev) => ({ ...prev, [medId]: status }));
 
-  useEffect(() => {
-    const id = setInterval(refresh, 8000);
-    return () => clearInterval(id);
-  }, [refresh]);
+    // 2. Remove matching upcoming reminder
+    const matchedMed = todayMedications.find((m) => m.id === medId);
+    if (matchedMed) {
+      setUpcomingDoses((prev) =>
+        prev.filter((d) => d.medicationName.toLowerCase() !== matchedMed.name.toLowerCase())
+      );
+    }
 
-  // ── Alert dismiss ──────────────────────────────────────────────────────────
-  const dismissAlert = (id: string) => {
-    setAlerts((prev) => prev.filter((a) => a.id !== id));
+    // 3. Persist to API
+    try {
+      await apiLogDose({
+        medicationId: medId,
+        status: status === "taken" ? "taken" : "skipped",
+        scheduledAt: new Date().toISOString(),
+      });
+      await mutateMeds();
+    } catch (err) {
+      console.error("[dashboard] Failed to persist dose log:", err);
+    }
   };
 
-  // ── Log dose ───────────────────────────────────────────────────────────────
-  const logDose = (medId: string, status: TodayMedication["status"]) => {
-    setData((prev) => ({
-      ...prev,
-      todayMedications: prev.todayMedications.map((m): TodayMedication =>
-        m.id === medId ? { ...m, status } : m
-      ),
-    }));
+  const markUpcomingDoseTaken = async (doseId: string) => {
+    const dose = upcomingDoses.find((d) => d.id === doseId);
+    if (!dose) return;
+
+    setUpcomingDoses((prev) => prev.filter((d) => d.id !== doseId));
+
+    const matchedMed = todayMedications.find(
+      (m) => m.name.toLowerCase() === dose.medicationName.toLowerCase()
+    );
+    if (matchedMed) {
+      await logDose(matchedMed.id, "taken");
+    }
   };
 
-  const { patient, latestReadings, conditionSummaries, weeklyAdherence, streakDays, recentReadings, todayMedications } = data;
+  const { patient, conditionSummaries, weeklyAdherence, streakDays } = initialMock;
 
   // ── Condition-derived relevant vitals (Capped at 4) ───────────────────────
   const relevantVitalKeys = useMemo(
@@ -92,7 +209,7 @@ export default function DashboardPage() {
   );
 
   return (
-    <AppShell alertCount={alerts.length}>
+    <AppShell alertCount={activeAlerts.length}>
       <div className="max-w-5xl mx-auto px-4 lg:px-6 py-6 space-y-6">
 
         {/* ── 1. Greeting Header ─────────────────────────────────────────── */}
@@ -122,14 +239,16 @@ export default function DashboardPage() {
             {/* Manual refresh */}
             <button
               onClick={refresh}
-              className="p-2 rounded-lg bg-bg-card border border-divider text-text-secondary hover:text-accent-violet hover:border-accent-lavender transition-all shadow-card"
+              disabled={isRefreshing || isReadingsValidating}
+              className="p-2 rounded-lg bg-bg-card border border-divider text-text-secondary hover:text-accent-violet hover:border-accent-lavender transition-all shadow-card disabled:opacity-50"
               aria-label="Refresh readings"
             >
               <RefreshCw
                 size={16}
-                className={isRefreshing ? "animate-spin" : ""}
+                className={isRefreshing || isReadingsValidating ? "animate-spin" : ""}
               />
             </button>
+
             {/* Log reading action */}
             <button
               onClick={() => setLogModalOpen(true)}
@@ -198,6 +317,7 @@ export default function DashboardPage() {
                   icon={meta.icon}
                   sublabel={meta.sublabel}
                   animate={meta.key === "blood_glucose"}
+                  onClick={() => setLogModalOpen(true)}
                 />
               );
             })}
@@ -213,9 +333,9 @@ export default function DashboardPage() {
         </section>
 
         {/* ── 4. Active Alerts (Only rendered when activeAlerts.length > 0) ── */}
-        {alerts.length > 0 && (
+        {activeAlerts.length > 0 && (
           <section aria-label="Active Alerts">
-            <AlertBanner alerts={alerts} onDismiss={dismissAlert} />
+            <AlertBanner alerts={activeAlerts} onDismiss={dismissAlert} />
           </section>
         )}
 
@@ -259,9 +379,13 @@ export default function DashboardPage() {
         <LogReadingModal
           open={logModalOpen}
           onClose={() => setLogModalOpen(false)}
-          onSaved={() => refresh()}
+          onSaved={() => {
+            void mutateReadings();
+            void mutateAlerts();
+          }}
         />
       </div>
     </AppShell>
   );
 }
+

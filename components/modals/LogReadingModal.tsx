@@ -66,10 +66,21 @@ export default function LogReadingModal({ open, onClose, onSaved }: LogReadingMo
       setError(`Please enter a value between ${selected.min} and ${selected.max} ${selected.unit}`);
       return;
     }
+
+    let diastolicVal: number | undefined;
+    if (selected.type === "blood_pressure_systolic" && diastolic.trim()) {
+      diastolicVal = parseFloat(diastolic);
+      if (isNaN(diastolicVal) || diastolicVal < 40 || diastolicVal > 150) {
+        setError("Please enter a valid diastolic value between 40 and 150 mmHg");
+        return;
+      }
+    }
+
     setError(null);
     setSaving(true);
 
     const noteText = [contextTag, notes].filter(Boolean).join(" — ");
+    const nowIso = new Date().toISOString();
 
     const result = await postReading({
       patientId: "pat_arjun_01",
@@ -77,9 +88,21 @@ export default function LogReadingModal({ open, onClose, onSaved }: LogReadingMo
       value: numVal,
       unit: selected.unit,
       source: "manual",
-      recordedAt: new Date().toISOString(),
+      recordedAt: nowIso,
       notes: noteText || undefined,
     });
+
+    if (result.success && diastolicVal !== undefined) {
+      await postReading({
+        patientId: "pat_arjun_01",
+        type: "blood_pressure_diastolic",
+        value: diastolicVal,
+        unit: selected.unit,
+        source: "manual",
+        recordedAt: nowIso,
+        notes: noteText ? `${noteText} (diastolic)` : undefined,
+      });
+    }
 
     setSaving(false);
     if (result.success) {

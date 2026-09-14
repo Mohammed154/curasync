@@ -11,6 +11,7 @@ interface VitalCardProps {
   icon: string;
   sublabel?: string;
   animate?: boolean;
+  onClick?: () => void;
 }
 
 const STATUS = {
@@ -27,16 +28,26 @@ export default function VitalCard({
   icon,
   sublabel,
   animate = false,
+  onClick,
 }: VitalCardProps) {
   const s = STATUS[status];
 
   return (
     <div
+      onClick={onClick}
+      onKeyDown={(e) => {
+        if (onClick && (e.key === "Enter" || e.key === " ")) {
+          e.preventDefault();
+          onClick();
+        }
+      }}
+      tabIndex={onClick ? 0 : undefined}
       className={clsx(
         "bg-bg-card rounded-lg p-3 flex flex-col gap-1.5 shadow-card card-enter",
-        "hover:scale-[1.02] transition-transform duration-200 cursor-default"
+        "hover:scale-[1.02] transition-transform duration-200",
+        onClick ? "cursor-pointer active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-accent-violet/30" : "cursor-default"
       )}
-      role="region"
+      role={onClick ? "button" : "region"}
       aria-label={`${label}: ${value} ${unit}`}
     >
       {/* Icon + status dot */}

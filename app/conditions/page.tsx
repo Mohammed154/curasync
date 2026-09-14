@@ -24,12 +24,12 @@ const CONDITION_DETAILS: Record<string, {
   diabetes_t2:   { description: "Blood sugar management & insulin resistance", keyMetric: "142 mg/dL", lastUpdated: "8 min ago", weekTrend: "down" },
   hypertension:  { description: "Blood pressure control & cardiovascular risk", keyMetric: "138/88 mmHg", lastUpdated: "8 min ago", weekTrend: "stable" },
   ckd:           { description: "Kidney filtration rate & toxin clearance", keyMetric: "eGFR 48", lastUpdated: "Apr 10", weekTrend: "stable" },
-  copd:          { description: "Airflow obstruction & lung function", keyMetric: "SpO₂ 96%", lastUpdated: "Yesterday", weekTrend: "stable" },
+  copd:          { description: "Airflow obstruction & lung function", keyMetric: "FEV1 68%", lastUpdated: "Yesterday", weekTrend: "stable" },
   chf:           { description: "Cardiac output & fluid management", keyMetric: "BP 130/80", lastUpdated: "2 hr ago", weekTrend: "stable" },
   cad:           { description: "Coronary perfusion & cardiac events", keyMetric: "BP 130/80", lastUpdated: "2 hr ago", weekTrend: "stable" },
   hypothyroidism:{ description: "Thyroid hormone levels & metabolism", keyMetric: "TSH 4.2", lastUpdated: "Mar 28", weekTrend: "stable" },
   ra:            { description: "Joint inflammation & autoimmune activity", keyMetric: "DAS28: 3.4", lastUpdated: "Apr 1", weekTrend: "down" },
-  asthma:        { description: "Airway inflammation & bronchospasm", keyMetric: "SpO₂ 98%", lastUpdated: "Yesterday", weekTrend: "stable" },
+  asthma:        { description: "Airway inflammation & bronchospasm", keyMetric: "Control 22/25", lastUpdated: "Yesterday", weekTrend: "stable" },
   diabetes_t1:   { description: "Insulin-dependent glucose management", keyMetric: "142 mg/dL", lastUpdated: "8 min ago", weekTrend: "down" },
 };
 
@@ -43,12 +43,12 @@ const METRIC_METADATA: Record<ConditionId, {
   diabetes_t1:    { metricLabel: "Blood Glucose",  unit: "mg/dL",  status: "amber", trend: "down" },
   hypertension:   { metricLabel: "Blood Pressure", unit: "mmHg",   status: "amber", trend: "stable" },
   ckd:            { metricLabel: "eGFR",           unit: "mL/min", status: "amber", trend: "stable" },
-  copd:           { metricLabel: "SpO₂",           unit: "%",      status: "green", trend: "stable" },
+  copd:           { metricLabel: "FEV1",           unit: "%",      status: "green", trend: "stable" },
   chf:            { metricLabel: "Blood Pressure", unit: "mmHg",   status: "green", trend: "stable" },
   cad:            { metricLabel: "Blood Pressure", unit: "mmHg",   status: "green", trend: "stable" },
   hypothyroidism: { metricLabel: "TSH",            unit: "mIU/L",  status: "green", trend: "stable" },
   ra:             { metricLabel: "DAS28 Score",    unit: "",       status: "green", trend: "down" },
-  asthma:         { metricLabel: "SpO₂",           unit: "%",      status: "green", trend: "stable" },
+  asthma:         { metricLabel: "Control Score",  unit: "/25",    status: "green", trend: "stable" },
 };
 
 const METRIC_VALUES: Record<ConditionId, string> = {
@@ -56,12 +56,12 @@ const METRIC_VALUES: Record<ConditionId, string> = {
   diabetes_t1: "142",
   hypertension: "138/88",
   ckd: "48",
-  copd: "96",
+  copd: "68",
   chf: "130/80",
   cad: "130/80",
   hypothyroidism: "4.2",
   ra: "3.4",
-  asthma: "98",
+  asthma: "22",
 };
 
 export default function ConditionsPage() {

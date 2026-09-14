@@ -11,7 +11,7 @@ import {
 import { clsx } from "clsx";
 
 const FEATURES = [
-  { icon: Activity,    title: "Live Health Monitoring",  description: "Real-time biometric tracking from wearables and manual entry. Blood glucose, BP, SpO₂ — all in one dashboard.", color: "#00CEC9", bg: "#E6FAF9" },
+  { icon: Activity,    title: "Live Health Monitoring",  description: "Real-time biometric tracking from wearables and manual entry. Blood glucose, BP, weight — all in one dashboard.", color: "#00CEC9", bg: "#E6FAF9" },
   { icon: Video,       title: "Live Video Consultations", description: "Encrypted HD telehealth video rooms. Connect with your specialist or care team right from the browser.", color: "#6C5CE7", bg: "#F0EFF8" },
   { icon: Brain,       title: "AI Doctor",               description: "Get instant, plain-language explanations of your readings and personalised questions to ask your care team.", color: "#A29BFE", bg: "#F0EFF8" },
   { icon: Pill,        title: "Medication Management",   description: "Never miss a dose. Smart reminders, adherence tracking, and drug-condition conflict alerts built in.", color: "#E84393", bg: "#FFF0F7" },

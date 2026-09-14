@@ -57,14 +57,14 @@ const CONDITION_METRICS: Record<string, {
     chartLabel: "eGFR trend (6 months)",
   },
   copd: {
-    primary: { label: "Peak Flow", value: "380", unit: "L/min", status: "green" },
+    primary: { label: "FEV1", value: "68", unit: "%", status: "green" },
     secondary: [
       { label: "FEV1/FVC", value: "68", unit: "%" },
-      { label: "Oxygen Saturation", value: "95", unit: "%" },
+      { label: "Activity tolerance", value: "Normal", unit: "" },
       { label: "Inhaler use", value: "1.2", unit: "/day" },
       { label: "Last spirometry", value: "May 12", unit: "" },
     ],
-    chartLabel: "7-day peak flow trend",
+    chartLabel: "6-month FEV1 trend",
   },
   chf: {
     primary: { label: "Heart Rate", value: "74", unit: "bpm", status: "green" },
@@ -107,14 +107,14 @@ const CONDITION_METRICS: Record<string, {
     chartLabel: "DAS28 score trend (6 months)",
   },
   asthma: {
-    primary: { label: "SpO₂", value: "98", unit: "%", status: "green" },
+    primary: { label: "Control Test Score", value: "22", unit: "/25", status: "green" },
     secondary: [
       { label: "Rescue inhaler use", value: "1", unit: "/week" },
       { label: "Control test score", value: "22", unit: "/25" },
       { label: "Trigger events", value: "0", unit: "this week" },
       { label: "Last checkup", value: "May 05", unit: "" },
     ],
-    chartLabel: "7-day blood oxygen (SpO₂) trend",
+    chartLabel: "Asthma control score trend (6 months)",
   },
 };
 

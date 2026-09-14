@@ -339,11 +339,6 @@ export default function VideoRoom({
                   <span className="font-bold text-amber-300">138/88</span>
                   <span className="text-[10px] text-slate-400">mmHg</span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-cyan-400">💨</span>
-                  <span className="text-slate-400">SpO₂:</span>
-                  <span className="font-bold text-emerald-400">97%</span>
-                </div>
               </div>
             </div>
           )}

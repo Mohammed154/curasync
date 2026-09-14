@@ -124,8 +124,6 @@ export default async function PdfPreviewPage({ searchParams }: Props) {
               {[
                 { label: "Blood Glucose", value: latestReadings.bloodGlucose, unit: "mg/dL", status: latestReadings.bloodGlucose > 180 ? "amber" : "green" },
                 { label: "Blood Pressure", value: `${latestReadings.systolic}/${latestReadings.diastolic}`, unit: "mmHg", status: latestReadings.systolic > 140 ? "amber" : "green" },
-                { label: "Heart Rate", value: latestReadings.heartRate, unit: "bpm", status: "green" },
-                { label: "SpO₂", value: latestReadings.spo2, unit: "%", status: latestReadings.spo2 < 94 ? "amber" : "green" },
                 { label: "Weight", value: latestReadings.weight, unit: "kg", status: "green" },
                 { label: "Medication Adherence", value: `${weeklyAdherence}%`, unit: "this week", status: weeklyAdherence >= 80 ? "green" : "amber" },
               ].map((v) => (
@@ -296,8 +294,6 @@ export default async function PdfPreviewPage({ searchParams }: Props) {
                 {[
                   { metric: "Blood Glucose (Fasting)", normal: "70–99 mg/dL", high: ">250 mg/dL", critical: ">400 or <54 mg/dL" },
                   { metric: "Blood Pressure (Systolic)", normal: "<120 mmHg", high: ">150 mmHg", critical: ">180 mmHg" },
-                  { metric: "Heart Rate", normal: "60–100 bpm", high: ">120 bpm", critical: ">150 or <40 bpm" },
-                  { metric: "SpO₂", normal: "≥95%", high: "<94%", critical: "<90%" },
                 ].map((r) => (
                   <tr key={r.metric}>
                     <td style={{ fontWeight: 600 }}>{r.metric}</td>

@@ -28,15 +28,15 @@ const CONNECTED_DEVICES: WearableDevice[] = [
     authType: "apple_health",
     status: "connected",
     lastSync: subMinutes(new Date(), 8),
-    metrics: ["Heart Rate", "SpO₂", "Steps", "Sleep", "ECG", "Blood Oxygen"],
+    metrics: ["Steps", "Sleep", "Active Minutes", "Activity"],
     syncFrequency: "Continuous (background)",
     batteryPct: 74,
   },
 ];
 
 const AVAILABLE_DEVICES = [
-  { id: "fitbit", name: "Fitbit Charge 6 / Sense 2", brand: "Fitbit", icon: "📿", authType: "oauth" as const, metrics: ["HR", "SpO₂", "Sleep", "Steps", "Skin Temp"] },
-  { id: "garmin", name: "Garmin Fenix / Venu Series", brand: "Garmin", icon: "🏃", authType: "oauth" as const, metrics: ["HR", "SpO₂", "Steps", "Body Battery", "Stress"] },
+  { id: "fitbit", name: "Fitbit Charge 6 / Sense 2", brand: "Fitbit", icon: "📿", authType: "oauth" as const, metrics: ["Steps", "Sleep", "Skin Temp"] },
+  { id: "garmin", name: "Garmin Fenix / Venu Series", brand: "Garmin", icon: "🏃", authType: "oauth" as const, metrics: ["Steps", "Body Battery", "Stress"] },
   { id: "ble_glucose", name: "BLE Glucometer", brand: "Accu-Chek / OneTouch", icon: "🩸", authType: "ble" as const, metrics: ["Blood Glucose"] },
   { id: "ble_bp", name: "BLE Blood Pressure Cuff", brand: "Omron / Withings", icon: "💉", authType: "ble" as const, metrics: ["Systolic BP", "Diastolic BP", "Pulse"] },
   { id: "ble_scale", name: "Smart Scale", brand: "Withings / Renpho", icon: "⚖️", authType: "ble" as const, metrics: ["Weight", "BMI", "Body Fat %"] },

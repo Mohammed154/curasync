@@ -17,7 +17,7 @@ const PATIENT_CONTEXT = (() => {
   const d = getMockDashboardData();
   return `Patient: ${d.patient.name}, Age: ${2026 - parseInt(d.patient.dateOfBirth.slice(0,4))}.
 Conditions: ${d.patient.conditions.join(", ")}.
-Latest readings: Blood Glucose ${d.latestReadings.bloodGlucose} mg/dL, BP ${d.latestReadings.systolic}/${d.latestReadings.diastolic} mmHg, HR ${d.latestReadings.heartRate} bpm, SpO2 ${d.latestReadings.spo2}%.
+Latest readings: Blood Glucose ${d.latestReadings.bloodGlucose} mg/dL, BP ${d.latestReadings.systolic}/${d.latestReadings.diastolic} mmHg, Weight ${d.latestReadings.weight} kg.
 Medications: ${d.todayMedications.map(m => `${m.name} ${m.dosage}`).join(", ")}.
 Weekly adherence: ${d.weeklyAdherence}%.`;
 })();

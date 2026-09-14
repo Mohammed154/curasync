@@ -38,11 +38,6 @@ const DEFAULT_THRESHOLDS: ThresholdConfig[] = [
     highThreshold: 120, criticalThreshold: 150,
     globalHigh: 120, globalCritical: 150, direction: "above",
   },
-  {
-    type: "spo2", label: "SpO₂ (Low)", icon: "💨", unit: "%",
-    highThreshold: 94, criticalThreshold: 90,
-    globalHigh: 94, globalCritical: 90, direction: "below",
-  },
 ];
 
 interface Props {

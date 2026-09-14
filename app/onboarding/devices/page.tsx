@@ -16,8 +16,8 @@ interface Device {
 
 const DEVICES: Device[] = [
   { id: "apple_health", name: "Apple Health", description: "Syncs all metrics automatically via HealthKit", icon: "🍎", available: true, authType: "native" },
-  { id: "apple_watch",  name: "Apple Watch", description: "Heart rate, SpO2, activity, ECG complications", icon: "⌚", available: true, authType: "native" },
-  { id: "fitbit",       name: "Fitbit", description: "Cloud sync every 15 min — steps, HR, sleep, SpO2", icon: "📿", available: true, authType: "oauth" },
+  { id: "apple_watch",  name: "Apple Watch", description: "Steps, activity, sleep, and workout tracking", icon: "⌚", available: true, authType: "native" },
+  { id: "fitbit",       name: "Fitbit", description: "Cloud sync every 15 min — steps, sleep, activity", icon: "📿", available: true, authType: "oauth" },
   { id: "garmin",       name: "Garmin Connect", description: "Cloud sync every 15 min — all Garmin metrics", icon: "🏃", available: true, authType: "oauth" },
   { id: "ble_glucose",  name: "BLE Glucometer", description: "Bluetooth glucose meter — Accu-Chek, OneTouch supported", icon: "🩸", available: false, authType: "ble" },
   { id: "ble_bp",       name: "BLE Blood Pressure Cuff", description: "Omron BLE profile — automatic BP sync", icon: "💉", available: false, authType: "ble" },

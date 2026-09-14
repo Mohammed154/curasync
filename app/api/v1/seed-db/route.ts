@@ -13,7 +13,7 @@ export async function POST() {
 }
 
 async function handleSeed() {
-  const dbUrl = process.env.DATABASE_URL_DIRECT || process.env.DATABASE_URL;
+  const dbUrl = process.env.DATABASE_URL || process.env.DATABASE_URL_DIRECT;
   if (!dbUrl) {
     return NextResponse.json(
       { error: "DATABASE_URL is not configured" },
@@ -23,121 +23,140 @@ async function handleSeed() {
 
   let sql: postgres.Sql | undefined;
   try {
-    sql = postgres(dbUrl, { ssl: "require", connect_timeout: 10 });
+    sql = postgres(dbUrl, { ssl: "require", connect_timeout: 15, prepare: false });
 
-    const demoUserId = "user_demo_patient_001";
-    let patientProfiles = await sql`
-      SELECT id FROM patient_profiles WHERE user_id = ${demoUserId} LIMIT 1
+    const demoPatientId = "00000000-0000-0000-0000-000000000001";
+
+    // 1. Patient profile
+    await sql`
+      INSERT INTO patient_profiles (
+        id, user_id, name, date_of_birth, conditions, emergency_contact, language, onboarding_complete
+      ) VALUES (
+        ${demoPatientId},
+        'dev_user_001',
+        'Arjun Mehta',
+        '1965-04-12',
+        ARRAY['diabetes_t2', 'hypertension', 'ckd']::condition_id[],
+        ${JSON.stringify({ name: "Ananya Mehta", phone: "+1 555-0192", relationship: "Spouse" })},
+        'en',
+        true
+      )
+      ON CONFLICT (id) DO UPDATE SET
+        name = 'Arjun Mehta',
+        user_id = 'dev_user_001',
+        date_of_birth = '1965-04-12',
+        conditions = ARRAY['diabetes_t2', 'hypertension', 'ckd']::condition_id[],
+        emergency_contact = ${JSON.stringify({ name: "Ananya Mehta", phone: "+1 555-0192", relationship: "Spouse" })},
+        onboarding_complete = true,
+        updated_at = NOW();
     `;
 
-    let patientId: string;
-    if (patientProfiles.length === 0) {
-      const inserted = await sql`
-        INSERT INTO patient_profiles (
-          user_id, name, date_of_birth, conditions, emergency_contact
-        ) VALUES (
-          ${demoUserId},
-          'Eleanor Vance',
-          '1965-04-12',
-          ARRAY['diabetes_t2', 'hypertension', 'ckd']::text[],
-          ${JSON.stringify({ name: "Robert Vance", phone: "+15550192834", relationship: "Spouse" })}
-        )
-        RETURNING id;
-      `;
-      patientId = (inserted[0] as any)?.id;
-    } else {
-      patientId = (patientProfiles[0] as any)?.id;
-    }
+    // 2. Clean out old/unsupported vitals (peak_flow, heart_rate, spo2)
+    await sql`DELETE FROM alert_events WHERE type::text IN ('peak_flow', 'heart_rate', 'spo2');`;
+    await sql`DELETE FROM readings WHERE type::text IN ('peak_flow', 'heart_rate', 'spo2');`;
 
-    // Seed Medications
+    // 3. Seed Medications
+    await sql`DELETE FROM medication_logs WHERE patient_id = ${demoPatientId}`;
+    await sql`DELETE FROM medications WHERE patient_id = ${demoPatientId}`;
+
     const medsToInsert = [
-      { name: "Metformin", dosage: "500mg", frequency: "twice_daily", conditionId: "diabetes_t2", scheduledTimes: ["08:00", "20:00"] },
-      { name: "Lisinopril", dosage: "10mg", frequency: "once_daily", conditionId: "hypertension", scheduledTimes: ["09:00"] },
-      { name: "Empagliflozin (Jardiance)", dosage: "10mg", frequency: "once_daily", conditionId: "ckd", scheduledTimes: ["08:00"] },
-      { name: "Atorvastatin", dosage: "20mg", frequency: "once_daily", conditionId: "hypertension", scheduledTimes: ["21:00"] },
+      { name: "Metformin", dosage: "500mg", frequency: "twice_daily", conditionId: "diabetes_t2", schedule: ["08:00", "20:00"] },
+      { name: "Lisinopril", dosage: "10mg", frequency: "once_daily", conditionId: "hypertension", schedule: ["09:00"] },
+      { name: "Empagliflozin (Jardiance)", dosage: "10mg", frequency: "once_daily", conditionId: "ckd", schedule: ["08:00"] },
+      { name: "Atorvastatin", dosage: "20mg", frequency: "once_daily", conditionId: "hypertension", schedule: ["21:00"] }
     ];
 
-    let medsSeeded = 0;
-    for (const med of medsToInsert) {
-      const existingMed = await sql`
-        SELECT id FROM medications WHERE patient_id = ${patientId} AND name = ${med.name} LIMIT 1
+    const insertedMeds = [];
+    for (const m of medsToInsert) {
+      const [row] = await sql`
+        INSERT INTO medications (
+          patient_id, name, dosage, frequency, condition_id, custom_schedule, start_date, active
+        ) VALUES (
+          ${demoPatientId},
+          ${m.name},
+          ${m.dosage},
+          ${m.frequency}::dose_frequency,
+          ${m.conditionId}::condition_id,
+          ${m.schedule}::text[],
+          CURRENT_DATE - 45,
+          true
+        ) RETURNING id, name;
       `;
-      if (existingMed.length === 0) {
-        await sql`
-          INSERT INTO medications (
-            patient_id, name, dosage, frequency, condition_id, scheduled_times, start_date, active
-          ) VALUES (
-            ${patientId}, ${med.name}, ${med.dosage}, ${med.frequency}, ${med.conditionId}, ${med.scheduledTimes}, CURRENT_DATE, true
-          );
-        `;
-        medsSeeded++;
-      }
+      insertedMeds.push(row);
     }
 
-    // Seed Biometric Readings
+    // 4. Seed Medication Logs
+    const todayMorning = new Date();
+    todayMorning.setHours(8, 10, 0, 0);
+
+    for (const med of insertedMeds) {
+      await sql`
+        INSERT INTO medication_logs (
+          medication_id, patient_id, status, scheduled_at, logged_at
+        ) VALUES (
+          ${med.id}, ${demoPatientId}, 'taken'::medication_status, ${todayMorning.toISOString()}, ${todayMorning.toISOString()}
+        );
+      `;
+    }
+
+    // 5. Seed Biometric Readings for Home Care
+    await sql`DELETE FROM readings WHERE patient_id = ${demoPatientId}`;
+
+    const now = Date.now();
     const sampleReadings = [
-      { type: "blood_glucose", value: 142, unit: "mg/dL", source: "ble", minutesAgo: 10, notes: "Fasting blood sugar check" },
-      { type: "blood_glucose", value: 168, unit: "mg/dL", source: "manual", minutesAgo: 180, notes: "Post-lunch reading" },
-      { type: "blood_pressure_systolic", value: 138, unit: "mmHg", source: "ble", minutesAgo: 30, notes: "Morning resting BP" },
-      { type: "blood_pressure_diastolic", value: 88, unit: "mmHg", source: "ble", minutesAgo: 30, notes: "Morning resting BP" },
-      { type: "heart_rate", value: 74, unit: "bpm", source: "apple_health", minutesAgo: 15, notes: "Resting pulse" },
-      { type: "spo2", value: 98, unit: "%", source: "fitbit", minutesAgo: 45, notes: "Pulse oximeter check" },
-      { type: "weight", value: 72.5, unit: "kg", source: "manual", minutesAgo: 1440, notes: "Morning weigh-in" }
+      { type: "blood_glucose", value: 138, unit: "mg/dL", source: "ble", msAgo: 25 * 60 * 1000, notes: "Fasting morning reading" },
+      { type: "blood_glucose", value: 154, unit: "mg/dL", source: "manual", msAgo: 160 * 60 * 1000, notes: "Post-lunch 2h check" },
+      { type: "blood_glucose", value: 122, unit: "mg/dL", source: "ble", msAgo: 1400 * 60 * 1000, notes: "Yesterday fasting" },
+      { type: "blood_glucose", value: 145, unit: "mg/dL", source: "ble", msAgo: 2800 * 60 * 1000, notes: "2 days ago fasting" },
+      { type: "blood_pressure_systolic", value: 126, unit: "mmHg", source: "ble", msAgo: 40 * 60 * 1000, notes: "Morning resting BP" },
+      { type: "blood_pressure_diastolic", value: 82, unit: "mmHg", source: "ble", msAgo: 40 * 60 * 1000, notes: "Morning resting BP" },
+      { type: "weight", value: 74.2, unit: "kg", source: "manual", msAgo: 120 * 60 * 1000, notes: "Morning weight" },
+      { type: "steps", value: 6840, unit: "steps", source: "manual", msAgo: 45 * 60 * 1000, notes: "Evening walk" },
+      { type: "body_temp", value: 36.8, unit: "°C", source: "manual", msAgo: 180 * 60 * 1000, notes: "Normal" },
     ];
 
-    let readingsSeeded = 0;
     for (const r of sampleReadings) {
-      const recDate = new Date(Date.now() - r.minutesAgo * 60 * 1000);
+      const recDate = new Date(now - r.msAgo);
       await sql`
         INSERT INTO readings (
           patient_id, type, value, unit, source, recorded_at, notes
         ) VALUES (
-          ${patientId}, ${r.type}, ${r.value}, ${r.unit}, ${r.source}, ${recDate.toISOString()}, ${r.notes}
+          ${demoPatientId},
+          ${r.type}::reading_type,
+          ${r.value},
+          ${r.unit},
+          ${r.source}::reading_source,
+          ${recDate.toISOString()},
+          ${r.notes}
         );
       `;
-      readingsSeeded++;
     }
 
-    // Seed Journal Entries
-    const journalData = [
-      {
-        text: "Slight dizziness after taking morning blood pressure medication.",
-        severity: 2,
-        conditionId: "hypertension",
-        bodyLocation: "Head",
-        contextTags: ["dizziness", "morning", "medication_side_effect"],
-        editableUntil: new Date(Date.now() + 24 * 60 * 60 * 1000)
-      },
-      {
-        text: "Felt energetic after 30-min morning walk. Blood sugar level steady.",
-        severity: 1,
-        conditionId: "diabetes_t2",
-        bodyLocation: "General",
-        contextTags: ["exercise", "walking", "good_mood"],
-        editableUntil: new Date(Date.now() + 24 * 60 * 60 * 1000)
-      }
-    ];
-
-    let journalsSeeded = 0;
-    for (const j of journalData) {
-      await sql`
-        INSERT INTO journal_entries (
-          patient_id, text, severity, condition_id, body_location, context_tags, recorded_at, editable_until
-        ) VALUES (
-          ${patientId}, ${j.text}, ${j.severity}, ${j.conditionId}, ${j.bodyLocation}, ${j.contextTags}, NOW(), ${j.editableUntil.toISOString()}
-        );
-      `;
-      journalsSeeded++;
-    }
+    // 6. Seed Sample Alert Event
+    await sql`DELETE FROM alert_events WHERE patient_id = ${demoPatientId}`;
+    await sql`
+      INSERT INTO alert_events (
+        patient_id, severity, status, type, message, value, threshold, triggered_at
+      ) VALUES (
+        ${demoPatientId},
+        'medium'::alert_severity,
+        'active'::alert_status,
+        'blood_glucose'::reading_type,
+        'Post-prandial blood glucose slightly above target: 154 mg/dL',
+        154,
+        140,
+        NOW() - INTERVAL '2 hours'
+      );
+    `;
 
     return NextResponse.json({
       success: true,
-      message: "Database seeded successfully",
-      patientId,
+      message: "Database seeded successfully with clean demo dataset",
+      patientId: demoPatientId,
       summary: {
-        medicationsInserted: medsSeeded,
-        readingsInserted: readingsSeeded,
-        journalsInserted: journalsSeeded,
+        medicationsInserted: insertedMeds.length,
+        readingsInserted: sampleReadings.length,
+        alertsActive: 1,
       }
     });
   } catch (error: any) {

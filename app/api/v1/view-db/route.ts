@@ -5,7 +5,7 @@ import postgres from "postgres";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const dbUrl = process.env.DATABASE_URL_DIRECT || process.env.DATABASE_URL;
+  const dbUrl = process.env.DATABASE_URL || process.env.DATABASE_URL_DIRECT;
   if (!dbUrl) {
     return NextResponse.json(
       { error: "DATABASE_URL is not configured" },
@@ -15,8 +15,21 @@ export async function GET() {
 
   let sql: postgres.Sql | undefined;
   try {
-    sql = postgres(dbUrl, { ssl: "require", connect_timeout: 10 });
-    const tables = ["patient_profiles", "medications", "readings", "journal_entries", "alert_events", "messages", "audit_log"];
+    sql = postgres(dbUrl, { ssl: "require", connect_timeout: 15, prepare: false });
+    const tables = [
+      "patient_profiles",
+      "medications",
+      "medication_logs",
+      "readings",
+      "alert_events",
+      "consultations",
+      "follow_up_reminders",
+      "journal_entries",
+      "messages",
+      "provider_patients",
+      "invite_codes",
+      "audit_log"
+    ];
     const results: Record<string, any> = {};
 
     for (const table of tables) {

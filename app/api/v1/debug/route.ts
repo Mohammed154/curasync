@@ -24,7 +24,7 @@ export async function GET() {
   if (dbUrl.length > 0) {
     try {
       const postgres = (await import("postgres")).default;
-      const sql = postgres(dbUrl, { max: 1, connect_timeout: 5, ssl: "require" });
+      const sql = postgres(dbUrl, { max: 1, connect_timeout: 5, ssl: "require", prepare: false });
       const result = await sql`SELECT current_database() as db, current_user as usr, version() as ver`;
       await sql.end();
       dbTest = {
@@ -56,7 +56,7 @@ export async function GET() {
   if ((dbTest as { connected?: boolean }).connected) {
     try {
       const postgres = (await import("postgres")).default;
-      const sql = postgres(dbUrl, { max: 1, connect_timeout: 5, ssl: "require" });
+      const sql = postgres(dbUrl, { max: 1, connect_timeout: 5, ssl: "require", prepare: false });
       const tables = await sql`
         SELECT table_name
         FROM information_schema.tables
@@ -82,10 +82,10 @@ export async function GET() {
   if ((tablesTest as { missing?: string[] }).missing?.length === 0) {
     try {
       const postgres = (await import("postgres")).default;
-      const sql = postgres(dbUrl, { max: 1, connect_timeout: 5, ssl: "require" });
+      const sql = postgres(dbUrl, { max: 1, connect_timeout: 5, ssl: "require", prepare: false });
       await sql`
         INSERT INTO patient_profiles (user_id, name, date_of_birth, conditions)
-        VALUES ('debug_test_user', 'Debug Test', '1990-01-01', '{}')
+        VALUES ('debug_test_user', 'Debug Test', '1990-01-01', '{}'::condition_id[])
         ON CONFLICT (user_id) DO NOTHING
       `;
       await sql`DELETE FROM patient_profiles WHERE user_id = 'debug_test_user'`;

@@ -12,8 +12,10 @@ import {
   AlertTriangle,
   TrendingUp,
   Download,
+  Loader2,
 } from "lucide-react";
 import { clsx } from "clsx";
+import { requestPdfExport } from "@/hooks/useApi";
 
 type SortKey = "alertCount" | "adherenceScore" | "name" | "lastActivityDate";
 type FilterStatus = "all" | "red" | "amber" | "green";
@@ -25,6 +27,20 @@ export default function ProviderDashboardPage() {
   const [sortKey, setSortKey]     = useState<SortKey>("alertCount");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [filter, setFilter]       = useState<FilterStatus>("all");
+  const [exportingPdf, setExportingPdf] = useState(false);
+
+  const handleExportPdf = async () => {
+    if (exportingPdf) return;
+    setExportingPdf(true);
+    try {
+      await requestPdfExport();
+    } catch (err) {
+      console.error("PDF export error:", err);
+      alert("Failed to export PDF panel summary. Please try again.");
+    } finally {
+      setExportingPdf(false);
+    }
+  };
 
   const filtered = useMemo(() => {
     let list = [...allPatients];
@@ -96,9 +112,22 @@ export default function ProviderDashboardPage() {
               Dr. Priya · {allPatients.length} patients assigned
             </p>
           </div>
-          <button className="flex items-center gap-2 px-3 py-2 rounded-lg border border-divider bg-bg-card text-label-sm font-semibold text-text-secondary hover:text-accent-violet hover:border-accent-lavender transition-all shadow-card">
-            <Download size={15} aria-hidden="true" />
-            <span className="hidden sm:inline">Export PDF</span>
+          <button
+            onClick={handleExportPdf}
+            disabled={exportingPdf}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg border border-divider bg-bg-card text-label-sm font-semibold text-text-secondary hover:text-accent-violet hover:border-accent-lavender disabled:opacity-50 transition-all shadow-card"
+          >
+            {exportingPdf ? (
+              <>
+                <Loader2 size={15} className="animate-spin" aria-hidden="true" />
+                <span className="hidden sm:inline">Exporting...</span>
+              </>
+            ) : (
+              <>
+                <Download size={15} aria-hidden="true" />
+                <span className="hidden sm:inline">Export PDF</span>
+              </>
+            )}
           </button>
         </div>
 

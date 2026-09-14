@@ -17,13 +17,17 @@ const ENV_SPECS: EnvSpec[] = [
   { key: "NEXT_PUBLIC_SUPABASE_URL",           required: "production",  description: "Supabase project URL" },
   { key: "NEXT_PUBLIC_SUPABASE_ANON_KEY",      required: "production",  description: "Supabase anon public key" },
 
+  // Supabase Edge Function PDF generation
+  { key: "SUPABASE_PDF_FUNCTION_NAME",         required: "optional",    description: "Supabase Edge Function name for PDF export (e.g. html-to-pdf)" },
+  { key: "SUPABASE_SERVICE_ROLE_KEY",          required: "optional",    description: "Supabase Service Role Key (for Edge Functions & Admin)" },
+
   // Optional (feature-gated)
   { key: "GEMINI_API_KEY",                     required: "optional",    description: "Gemini API key (AI Doctor feature)" },
   { key: "RESEND_API_KEY",                     required: "optional",    description: "Resend API key (email)" },
   { key: "TWILIO_ACCOUNT_SID",                 required: "optional",    description: "Twilio SID (SMS alerts)" },
   { key: "TWILIO_AUTH_TOKEN",                  required: "optional",    description: "Twilio auth token" },
   { key: "TWILIO_PHONE_NUMBER",                required: "optional",    description: "Twilio sender number" },
-  { key: "AWS_ACCESS_KEY_ID",                  required: "optional",    description: "AWS access key (PDF Lambda)" },
+  { key: "AWS_ACCESS_KEY_ID",                  required: "optional",    description: "AWS access key (PDF Lambda fallback)" },
   { key: "AWS_SECRET_ACCESS_KEY",              required: "optional",    description: "AWS secret key" },
   { key: "AWS_REGION",                         required: "optional",    description: "AWS region" },
   { key: "AWS_S3_BUCKET",                      required: "optional",    description: "S3 bucket for PDF reports" },

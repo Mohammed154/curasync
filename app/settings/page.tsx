@@ -4,9 +4,10 @@ import React, { useState } from "react";
 import AppShell, { SafeSignOutButton } from "@/components/layout/AppShell";
 import {
   User, Bell, Shield, Watch, Download, Trash2, ChevronRight,
-  Moon, Globe, LogOut, Lock, FileText, Smartphone
+  Moon, Globe, LogOut, Lock, FileText, Smartphone, Loader2
 } from "lucide-react";
 import { clsx } from "clsx";
+import { requestPdfExport } from "@/hooks/useApi";
 
 interface SettingRow {
   id: string;
@@ -35,7 +36,22 @@ export default function SettingsPage() {
     largeText: false,
     shareWithProviders: true,
   });
-  const [pdfDownloadsToday] = useState(1); // max 5/day
+  const [pdfDownloadsToday, setPdfDownloadsToday] = useState(1); // max 5/day
+  const [exportingPdf, setExportingPdf] = useState(false);
+
+  const handleExportPdf = async () => {
+    if (exportingPdf || pdfDownloadsToday >= 5) return;
+    setExportingPdf(true);
+    try {
+      await requestPdfExport();
+      setPdfDownloadsToday((prev) => Math.min(5, prev + 1));
+    } catch (err) {
+      console.error("PDF export error:", err);
+      alert("Failed to export PDF report. Please try again.");
+    } finally {
+      setExportingPdf(false);
+    }
+  };
 
   const toggle = (key: keyof typeof toggles) =>
     setToggles((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -221,11 +237,21 @@ export default function SettingsPage() {
                         </div>
                         <p className="text-xs text-text-secondary mb-3">2-page clinical summary of your last 30 days — ready for your doctor appointment.</p>
                         <button
-                          disabled={pdfDownloadsToday >= 5}
+                          onClick={handleExportPdf}
+                          disabled={exportingPdf || pdfDownloadsToday >= 5}
                           className="w-full py-2.5 rounded-lg gradient-violet text-white text-label-sm font-semibold disabled:opacity-40 hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
                         >
-                          <Download size={14} aria-hidden="true" />
-                          Download 30-Day Report PDF
+                          {exportingPdf ? (
+                            <>
+                              <Loader2 size={14} className="animate-spin" aria-hidden="true" />
+                              Generating PDF Report...
+                            </>
+                          ) : (
+                            <>
+                              <Download size={14} aria-hidden="true" />
+                              Download 30-Day Report PDF
+                            </>
+                          )}
                         </button>
                       </div>
 

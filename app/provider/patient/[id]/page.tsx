@@ -7,10 +7,11 @@ import SymptomHeatmap from "@/components/provider/SymptomHeatmap";
 import AlertThresholdCustomizer from "@/components/provider/AlertThresholdCustomizer";
 import { getMockDashboardData, getMockProviderPanel } from "@/lib/mock-data";
 import { conditionColors } from "@/lib/design-tokens";
-import { ArrowLeft, Download, MessageSquare, AlertTriangle, CheckCircle2, Clock, Pill, Activity, FileText, BookOpen, Sliders, Video } from "lucide-react";
+import { ArrowLeft, Download, MessageSquare, AlertTriangle, CheckCircle2, Clock, Pill, Activity, FileText, BookOpen, Sliders, Video, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { clsx } from "clsx";
 import { format, subDays } from "date-fns";
+import { requestPdfExport } from "@/hooks/useApi";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -38,6 +39,12 @@ const STATUS_COLORS = {
   green: "#00B894", amber: "#F39C12", red: "#D63031",
 };
 
+const STATUS_BADGE = {
+  green: "bg-emerald-500/10 text-emerald-600",
+  amber: "bg-amber-500/10 text-amber-600",
+  red: "bg-rose-500/10 text-rose-600",
+};
+
 export default function ProviderPatientDetailPage({ params }: Props) {
   const { id } = React.use(params);
   const { recentReadings, todayMedications, weeklyAdherence } = getMockDashboardData();
@@ -46,6 +53,20 @@ export default function ProviderPatientDetailPage({ params }: Props) {
   const [tab, setTab] = useState<"timeline" | "medications" | "labs" | "symptoms" | "thresholds" | "notes">("timeline");
   const [providerNote, setProviderNote] = useState("");
   const [notes, setNotes] = useState<string[]>([]);
+  const [exportingPdf, setExportingPdf] = useState(false);
+
+  const handleExportPdf = async () => {
+    if (exportingPdf) return;
+    setExportingPdf(true);
+    try {
+      await requestPdfExport();
+    } catch (err) {
+      console.error("PDF export error:", err);
+      alert("Failed to export PDF. Please try again.");
+    } finally {
+      setExportingPdf(false);
+    }
+  };
 
   const takenCount = todayMedications.filter((m) => m.status === "taken").length;
 
@@ -57,25 +78,39 @@ export default function ProviderPatientDetailPage({ params }: Props) {
           <Link
             href="/provider"
             className="w-9 h-9 rounded-xl flex items-center justify-center bg-bg-card border border-divider shadow-card hover:bg-bg-lavender transition-colors flex-shrink-0 mt-1"
-            aria-label="Back to panel"
           >
-            <ArrowLeft size={17} className="text-text-secondary" />
+            <ArrowLeft size={16} className="text-text-secondary" />
           </Link>
           <div className="flex-1">
-            <div className="flex items-start justify-between gap-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <h1 className="font-bold text-display text-text-primary">{patient.name}</h1>
-                <p className="text-body-md text-text-secondary mt-0.5">
-                  {patient.age} yrs · {patient.conditions.map((c) => conditionColors[c]?.label).join(", ")}
+                <div className="flex items-center gap-2">
+                  <h1 className="text-display-sm font-bold text-text-primary">{patient.name}</h1>
+                  <span className={clsx("badge text-xs font-semibold px-2 py-0.5 rounded-full", STATUS_BADGE[patient.alertStatus])}>
+                    {patient.alertStatus.toUpperCase()}
+                  </span>
+                </div>
+                <p className="text-label-sm text-text-tertiary mt-0.5">
+                  Age {patient.age} · Last active {format(new Date(patient.lastActivityDate), "MMM d, h:mm a")}
                 </p>
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {patient.conditions.map((c) => {
+                    const cfg = conditionColors[c];
+                    return (
+                      <span key={c} className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: cfg?.bg ?? "#F0EFF8", color: cfg?.accent ?? "#6C5CE7" }}>
+                        {cfg?.emoji} {cfg?.label ?? c}
+                      </span>
+                    );
+                  })}
+                </div>
               </div>
-              <div className="flex items-center gap-2 flex-shrink-0">
+              <div className="flex items-center gap-2">
                 <Link
                   href="/provider/telehealth"
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-status-green hover:opacity-90 text-white text-label-sm font-bold shadow-card transition-all active:scale-95"
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-label-sm font-semibold shadow-card transition-all"
                 >
                   <Video size={14} aria-hidden="true" />
-                  Video Call
+                  Live Call
                 </Link>
                 <Link
                   href="/messages"
@@ -84,9 +119,22 @@ export default function ProviderPatientDetailPage({ params }: Props) {
                   <MessageSquare size={14} aria-hidden="true" />
                   Message
                 </Link>
-                <button className="flex items-center gap-1.5 px-3 py-2 rounded-lg gradient-violet text-white text-label-sm font-semibold shadow-card hover:opacity-90 transition-opacity">
-                  <Download size={14} aria-hidden="true" />
-                  PDF Export
+                <button
+                  onClick={handleExportPdf}
+                  disabled={exportingPdf}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg gradient-violet text-white text-label-sm font-semibold shadow-card hover:opacity-90 disabled:opacity-50 transition-opacity"
+                >
+                  {exportingPdf ? (
+                    <>
+                      <Loader2 size={14} className="animate-spin" aria-hidden="true" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <Download size={14} aria-hidden="true" />
+                      PDF Export
+                    </>
+                  )}
                 </button>
               </div>
             </div>

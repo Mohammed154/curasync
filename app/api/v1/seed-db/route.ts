@@ -66,7 +66,7 @@ async function handleSeed() {
       { name: "Atorvastatin", dosage: "20mg", frequency: "once_daily", conditionId: "hypertension", schedule: ["21:00"] }
     ];
 
-    const insertedMeds = [];
+    const insertedMeds: { id: string }[] = [];
     for (const m of medsToInsert) {
       const [row] = await sql`
         INSERT INTO medications (
@@ -82,7 +82,9 @@ async function handleSeed() {
           true
         ) RETURNING id, name;
       `;
-      insertedMeds.push(row);
+      if (row?.id) {
+        insertedMeds.push({ id: String(row.id) });
+      }
     }
 
     // 4. Seed Medication Logs
@@ -90,6 +92,7 @@ async function handleSeed() {
     todayMorning.setHours(8, 10, 0, 0);
 
     for (const med of insertedMeds) {
+      if (!med?.id) continue;
       await sql`
         INSERT INTO medication_logs (
           medication_id, patient_id, status, scheduled_at, logged_at

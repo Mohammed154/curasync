@@ -54,10 +54,21 @@ export default function GlucoseChart({
   targetMin = 70,
   targetMax = 180,
 }: GlucoseChartProps) {
-  const formatted = data.map((d) => ({
-    ...d,
-    label: format(new Date(d.time), "ha"),
-  }));
+  const formatted = data.map((d) => {
+    let label = d.time;
+    try {
+      const parsed = new Date(d.time);
+      if (!isNaN(parsed.getTime())) {
+        label = format(parsed, "ha");
+      }
+    } catch {
+      // Keep original label
+    }
+    return {
+      ...d,
+      label,
+    };
+  });
 
   // Show every 4th label on x-axis
   const tickFormatter = (_: string, index: number) =>

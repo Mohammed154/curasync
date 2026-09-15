@@ -91,10 +91,16 @@ export default function DashboardPage() {
       return initialMock.recentReadings;
     }
 
-    return glucoseReadings.map((r) => ({
-      time: format(new Date(r.recordedAt), "h a"),
-      value: Math.round(parseFloat(r.value)),
-    }));
+    return glucoseReadings.map((r: any) => {
+      const rawDate = r.recordedAt || r.recorded_at;
+      const parsed = rawDate ? new Date(rawDate) : new Date();
+      const validDate = !isNaN(parsed.getTime()) ? parsed : new Date();
+
+      return {
+        time: validDate.toISOString(),
+        value: Math.round(parseFloat(r.value)),
+      };
+    });
   }, [readingsData, initialMock.recentReadings]);
 
   // ── Derive Today's Medications from DB or Mock ───────────────────────────

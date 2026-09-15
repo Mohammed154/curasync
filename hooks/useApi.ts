@@ -56,17 +56,26 @@ export async function postReading(payload: {
   source: "manual" | "apple_health" | "fitbit" | "garmin" | "ble";
   recordedAt: string;
   notes?: string;
-}) {
+}): Promise<{ success: boolean; alertCount: number; error?: string }> {
   const res = await fetch("/api/v1/readings", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "include",
     body: JSON.stringify(payload),
   });
-  const data = await res.json() as { data: Reading & { alerts: Alert[] } };
+  let data: any = {};
+  try {
+    data = await res.json();
+  } catch {
+    // response body not JSON
+  }
   // Revalidate all reading queries
   await mutate((key: unknown) => typeof key === "string" && key.startsWith("/api/v1/readings"));
-  return { success: res.ok, alertCount: data.data?.alerts?.length ?? 0 };
+  return {
+    success: res.ok,
+    alertCount: data?.data?.alerts?.length ?? 0,
+    error: res.ok ? undefined : (data?.detail || data?.error || `HTTP ${res.status}`),
+  };
 }
 
 // ─── Alerts ───────────────────────────────────────────────────────────────────

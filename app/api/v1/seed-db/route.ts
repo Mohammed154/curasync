@@ -107,15 +107,10 @@ async function handleSeed() {
 
     const now = Date.now();
     const sampleReadings = [
-      { type: "blood_glucose", value: 138, unit: "mg/dL", source: "ble", msAgo: 25 * 60 * 1000, notes: "Fasting morning reading" },
-      { type: "blood_glucose", value: 154, unit: "mg/dL", source: "manual", msAgo: 160 * 60 * 1000, notes: "Post-lunch 2h check" },
-      { type: "blood_glucose", value: 122, unit: "mg/dL", source: "ble", msAgo: 1400 * 60 * 1000, notes: "Yesterday fasting" },
-      { type: "blood_glucose", value: 145, unit: "mg/dL", source: "ble", msAgo: 2800 * 60 * 1000, notes: "2 days ago fasting" },
-      { type: "blood_pressure_systolic", value: 126, unit: "mmHg", source: "ble", msAgo: 40 * 60 * 1000, notes: "Morning resting BP" },
-      { type: "blood_pressure_diastolic", value: 82, unit: "mmHg", source: "ble", msAgo: 40 * 60 * 1000, notes: "Morning resting BP" },
-      { type: "weight", value: 74.2, unit: "kg", source: "manual", msAgo: 120 * 60 * 1000, notes: "Morning weight" },
-      { type: "steps", value: 6840, unit: "steps", source: "manual", msAgo: 45 * 60 * 1000, notes: "Evening walk" },
-      { type: "body_temp", value: 36.8, unit: "°C", source: "manual", msAgo: 180 * 60 * 1000, notes: "Normal" },
+      { type: "blood_glucose", value: 138, unit: "mg/dL", source: "ble", msAgo: 120 * 60 * 1000, notes: "Morning fasting" },
+      { type: "blood_pressure_systolic", value: 126, unit: "mmHg", source: "ble", msAgo: 60 * 60 * 1000, notes: "Resting BP" },
+      { type: "blood_pressure_diastolic", value: 82, unit: "mmHg", source: "ble", msAgo: 60 * 60 * 1000, notes: "Resting BP" },
+      { type: "heart_rate", value: 72, unit: "bpm", source: "ble", msAgo: 30 * 60 * 1000, notes: "Resting pulse" },
     ];
 
     for (const r of sampleReadings) {

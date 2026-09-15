@@ -62,9 +62,16 @@ export async function POST(request: NextRequest) {
   const { type, value, unit, source, recordedAt, notes } = parsed.data;
   const triggeredAlerts = evaluateReading(authCtx.patientId, type, value);
 
-  // Write to DB if configured, otherwise return mock success for dev
+  // Write to DB if configured
   let insertedId = nanoid();
-  if (isDatabaseConfigured()) {
+  if (!isDatabaseConfigured()) {
+    if (process.env.NODE_ENV === "production") {
+      return NextResponse.json(
+        { error: "Database not configured. Please ensure DATABASE_URL is set in environment variables.", code: "DATABASE_NOT_CONFIGURED", requestId },
+        { status: 500 }
+      );
+    }
+  } else {
     try {
       const { db, readings, alertEvents } = await import("@/lib/db");
       const patId = authCtx.patientId as `${string}-${string}-${string}-${string}-${string}`;
@@ -108,7 +115,15 @@ export async function POST(request: NextRequest) {
       });
     } catch (err) {
       console.error("[readings] DB write error:", err);
-      // Don't block the response — alert evaluation already happened
+      return NextResponse.json(
+        {
+          error: "Failed to save reading to database",
+          detail: err instanceof Error ? err.message : String(err),
+          code: "DB_WRITE_ERROR",
+          requestId,
+        },
+        { status: 500 }
+      );
     }
   }
 

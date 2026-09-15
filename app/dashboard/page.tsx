@@ -41,40 +41,33 @@ export default function DashboardPage() {
     const base = { ...initialMock.latestReadings };
     if (!readingsData || readingsData.length === 0) return base;
 
+    const seenTypes = new Set<string>();
+
     for (const r of readingsData) {
+      if (seenTypes.has(r.type)) continue;
       const numVal = parseFloat(r.value);
       if (isNaN(numVal)) continue;
 
+      seenTypes.add(r.type);
+
       switch (r.type) {
         case "blood_glucose":
-          if (base.bloodGlucose === initialMock.latestReadings.bloodGlucose) {
-            base.bloodGlucose = Math.round(numVal);
-          }
+          base.bloodGlucose = Math.round(numVal);
           break;
         case "blood_pressure_systolic":
-          if (base.systolic === initialMock.latestReadings.systolic) {
-            base.systolic = Math.round(numVal);
-          }
+          base.systolic = Math.round(numVal);
           break;
         case "blood_pressure_diastolic":
-          if (base.diastolic === initialMock.latestReadings.diastolic) {
-            base.diastolic = Math.round(numVal);
-          }
+          base.diastolic = Math.round(numVal);
           break;
         case "heart_rate":
-          if (base.heartRate === initialMock.latestReadings.heartRate) {
-            base.heartRate = Math.round(numVal);
-          }
+          base.heartRate = Math.round(numVal);
           break;
         case "spo2":
-          if (base.spo2 === initialMock.latestReadings.spo2) {
-            base.spo2 = Math.round(numVal);
-          }
+          base.spo2 = Math.round(numVal);
           break;
         case "weight":
-          if (base.weight === initialMock.latestReadings.weight) {
-            base.weight = parseFloat(numVal.toFixed(1));
-          }
+          base.weight = parseFloat(numVal.toFixed(1));
           break;
       }
     }
@@ -94,7 +87,7 @@ export default function DashboardPage() {
       .slice(0, 12)
       .reverse();
 
-    if (glucoseReadings.length < 2) {
+    if (glucoseReadings.length === 0) {
       return initialMock.recentReadings;
     }
 

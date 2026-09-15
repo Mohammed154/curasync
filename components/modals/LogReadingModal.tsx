@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { X, Check, ChevronDown, Loader2 } from "lucide-react";
 import { clsx } from "clsx";
 import type { BiometricType } from "@/types";
-import { postReading } from "@/hooks/useRealTimeReadings";
+import { postReading } from "@/hooks/useApi";
 
 interface LogReadingModalProps {
   open: boolean;
@@ -83,7 +83,6 @@ export default function LogReadingModal({ open, onClose, onSaved }: LogReadingMo
     const nowIso = new Date().toISOString();
 
     const result = await postReading({
-      patientId: "pat_arjun_01",
       type: selected.type,
       value: numVal,
       unit: selected.unit,
@@ -94,7 +93,6 @@ export default function LogReadingModal({ open, onClose, onSaved }: LogReadingMo
 
     if (result.success && diastolicVal !== undefined) {
       await postReading({
-        patientId: "pat_arjun_01",
         type: "blood_pressure_diastolic",
         value: diastolicVal,
         unit: selected.unit,

@@ -2,8 +2,6 @@
 
 import { useState, useEffect, useCallback } from "react";
 import type { BiometricType } from "@/types";
-import { getStreamedReading } from "@/lib/mock-data";
-
 interface ReadingState {
   value: number;
   lastUpdated: Date;
@@ -12,21 +10,19 @@ interface ReadingState {
 
 interface UseRealTimeReadingsOptions {
   baseValue: number;
-  variance: number;
+  variance?: number;
   intervalMs?: number;
   enabled?: boolean;
 }
 
 /**
- * Simulates a live biometric reading with periodic updates.
- * Replace the interval body with a real fetch to /api/v1/readings
- * when the TimescaleDB backend is connected.
+ * Hook for live biometric reading state with periodic updates.
  */
 export function useRealTimeReading({
   baseValue,
-  variance,
+  variance = 0,
   intervalMs = 8000,
-  enabled = true,
+  enabled = false,
 }: UseRealTimeReadingsOptions): ReadingState & { refresh: () => void } {
   const [state, setState] = useState<ReadingState>({
     value: baseValue,
@@ -36,15 +32,12 @@ export function useRealTimeReading({
 
   const refresh = useCallback(() => {
     setState((prev) => ({ ...prev, status: "refreshing" }));
-    // In production: fetch from /api/v1/readings?patientId=...&type=...&limit=1
-    setTimeout(() => {
-      setState({
-        value: getStreamedReading(baseValue, variance),
-        lastUpdated: new Date(),
-        status: "idle",
-      });
-    }, 400);
-  }, [baseValue, variance]);
+    setState({
+      value: baseValue,
+      lastUpdated: new Date(),
+      status: "idle",
+    });
+  }, [baseValue]);
 
   useEffect(() => {
     if (!enabled) return;

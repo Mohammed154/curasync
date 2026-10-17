@@ -12,6 +12,7 @@ import {
   ReferenceLine,
 } from "recharts";
 import { format } from "date-fns";
+import { Activity } from "lucide-react";
 import type { SparklinePoint } from "@/types";
 
 interface GlucoseChartProps {
@@ -95,76 +96,86 @@ export default function GlucoseChart({
         </div>
       </div>
 
-      <ResponsiveContainer width="100%" height={160}>
-        <AreaChart data={formatted} margin={{ top: 8, right: 4, left: -20, bottom: 0 }}>
-          <defs>
-            <linearGradient id="glucoseGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%"  stopColor="#00CEC9" stopOpacity={0.25} />
-              <stop offset="95%" stopColor="#00CEC9" stopOpacity={0.02} />
-            </linearGradient>
-          </defs>
+      {formatted.length === 0 ? (
+        <div className="h-40 flex flex-col items-center justify-center text-center gap-2 text-text-tertiary">
+          <Activity size={24} className="opacity-40" />
+          <p className="text-xs">No blood glucose readings logged yet.</p>
+          <p className="text-[11px] text-text-tertiary">Click &quot;Log Reading&quot; above to record your first entry.</p>
+        </div>
+      ) : (
+        <>
+          <ResponsiveContainer width="100%" height={160}>
+            <AreaChart data={formatted} margin={{ top: 8, right: 4, left: -20, bottom: 0 }}>
+              <defs>
+                <linearGradient id="glucoseGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%"  stopColor="#00CEC9" stopOpacity={0.25} />
+                  <stop offset="95%" stopColor="#00CEC9" stopOpacity={0.02} />
+                </linearGradient>
+              </defs>
 
-          <CartesianGrid
-            strokeDasharray="3 3"
-            vertical={false}
-            stroke="#E2E0F0"
-            strokeOpacity={0.6}
-          />
+              <CartesianGrid
+                strokeDasharray="3 3"
+                vertical={false}
+                stroke="#E2E0F0"
+                strokeOpacity={0.6}
+              />
 
-          {/* Target range reference band */}
-          <ReferenceLine
-            y={targetMin}
-            stroke="#FDCB6E"
-            strokeDasharray="4 4"
-            strokeWidth={1}
-            label={{ value: `${targetMin}`, position: "right", fontSize: 10, fill: "#8888A8" }}
-          />
-          <ReferenceLine
-            y={targetMax}
-            stroke="#FDCB6E"
-            strokeDasharray="4 4"
-            strokeWidth={1}
-            label={{ value: `${targetMax}`, position: "right", fontSize: 10, fill: "#8888A8" }}
-          />
+              {/* Target range reference band */}
+              <ReferenceLine
+                y={targetMin}
+                stroke="#FDCB6E"
+                strokeDasharray="4 4"
+                strokeWidth={1}
+                label={{ value: `${targetMin}`, position: "right", fontSize: 10, fill: "#8888A8" }}
+              />
+              <ReferenceLine
+                y={targetMax}
+                stroke="#FDCB6E"
+                strokeDasharray="4 4"
+                strokeWidth={1}
+                label={{ value: `${targetMax}`, position: "right", fontSize: 10, fill: "#8888A8" }}
+              />
 
-          <XAxis
-            dataKey="label"
-            tickFormatter={tickFormatter}
-            tick={{ fontSize: 11, fill: "#8888A8" }}
-            axisLine={false}
-            tickLine={false}
-          />
-          <YAxis
-            domain={[50, 250]}
-            tick={{ fontSize: 11, fill: "#8888A8" }}
-            axisLine={false}
-            tickLine={false}
-            tickCount={5}
-          />
+              <XAxis
+                dataKey="label"
+                tickFormatter={tickFormatter}
+                tick={{ fontSize: 11, fill: "#8888A8" }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <YAxis
+                domain={[50, 250]}
+                tick={{ fontSize: 11, fill: "#8888A8" }}
+                axisLine={false}
+                tickLine={false}
+                tickCount={5}
+              />
 
-          <Tooltip content={<CustomTooltip />} />
+              <Tooltip content={<CustomTooltip />} />
 
-          <Area
-            type="monotoneX"
-            dataKey="value"
-            stroke="#00CEC9"
-            strokeWidth={2}
-            fill="url(#glucoseGradient)"
-            dot={false}
-            activeDot={{
-              r: 4,
-              fill: "#00CEC9",
-              stroke: "#fff",
-              strokeWidth: 2,
-            }}
-          />
-        </AreaChart>
-      </ResponsiveContainer>
+              <Area
+                type="monotoneX"
+                dataKey="value"
+                stroke="#00CEC9"
+                strokeWidth={2}
+                fill="url(#glucoseGradient)"
+                dot={false}
+                activeDot={{
+                  r: 4,
+                  fill: "#00CEC9",
+                  stroke: "#fff",
+                  strokeWidth: 2,
+                }}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
 
-      {/* Reference range legend */}
-      <p className="text-xs text-text-tertiary text-center mt-2">
-        Target range: {targetMin}–{targetMax} mg/dL
-      </p>
+          {/* Reference range legend */}
+          <p className="text-xs text-text-tertiary text-center mt-2">
+            Target range: {targetMin}–{targetMax} mg/dL
+          </p>
+        </>
+      )}
     </div>
   );
 }

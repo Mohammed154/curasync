@@ -29,7 +29,7 @@ const TREND_CONFIG = {
 
 // Default weekly data — replaced by BullMQ-generated narrative in production
 export const DEFAULT_WEEKLY_SUMMARY: WeeklySummaryCardProps = {
-  patientName: "Arjun",
+  patientName: "Patient",
   weekOf: "Apr 28 – May 4, 2026",
   adherence: 87,
   adherenceDelta: +4,

@@ -6,7 +6,7 @@ import { clsx } from "clsx";
 import { conditionColors } from "@/lib/design-tokens";
 import type { ConditionId } from "@/types";
 
-interface UpcomingDose {
+export interface UpcomingDose {
   id: string;
   medicationName: string;
   dosage: string;
@@ -20,37 +20,6 @@ interface UpcomingRemindersStripProps {
   doses: UpcomingDose[];
   onMarkTaken?: (id: string) => void;
 }
-
-// Mock upcoming doses — replaced by real schedule in production
-export const MOCK_UPCOMING_DOSES: UpcomingDose[] = [
-  {
-    id: "u1",
-    medicationName: "Lisinopril",
-    dosage: "10mg",
-    scheduledAt: "21:00",
-    conditionId: "hypertension",
-    minutesUntil: 45,
-    status: "upcoming",
-  },
-  {
-    id: "u2",
-    medicationName: "Metformin",
-    dosage: "500mg",
-    scheduledAt: "21:00",
-    conditionId: "diabetes_t2",
-    minutesUntil: 45,
-    status: "upcoming",
-  },
-  {
-    id: "u3",
-    medicationName: "Calcitriol",
-    dosage: "0.25mcg",
-    scheduledAt: "22:00",
-    conditionId: "ckd",
-    minutesUntil: 105,
-    status: "upcoming",
-  },
-];
 
 function formatTimeUntil(minutes: number): string {
   if (minutes < 0) return `${Math.abs(minutes)}m overdue`;

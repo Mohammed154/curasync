@@ -37,9 +37,10 @@ export const VITAL_METADATA: Record<string, VitalDisplayMeta> = {
     label: "Blood Glucose",
     unit: "mg/dL",
     icon: "🩸",
-    getValue: (r) => String(r.bloodGlucose ?? 142),
+    getValue: (r) => (r.bloodGlucose != null ? String(r.bloodGlucose) : "--"),
     getStatus: (r) => {
-      const v = r.bloodGlucose ?? 142;
+      const v = r.bloodGlucose;
+      if (v == null) return "green";
       return v > 250 || v < 54 ? "red" : v > 180 || v < 70 ? "amber" : "green";
     },
   },
@@ -49,10 +50,11 @@ export const VITAL_METADATA: Record<string, VitalDisplayMeta> = {
     label: "Blood Pressure",
     unit: "mmHg",
     icon: "💉",
-    getValue: (r) => `${r.systolic ?? 138}/${r.diastolic ?? 88}`,
+    getValue: (r) => (r.systolic != null && r.diastolic != null ? `${r.systolic}/${r.diastolic}` : "--"),
     getStatus: (r) => {
-      const s = r.systolic ?? 138;
-      const d = r.diastolic ?? 88;
+      const s = r.systolic;
+      const d = r.diastolic;
+      if (s == null || d == null) return "green";
       return s > 180 || d > 120 ? "red" : s > 130 || d > 85 ? "amber" : "green";
     },
   },
@@ -62,9 +64,10 @@ export const VITAL_METADATA: Record<string, VitalDisplayMeta> = {
     label: "Heart Rate",
     unit: "bpm",
     icon: "❤️",
-    getValue: (r) => String(r.heartRate ?? 74),
+    getValue: (r) => (r.heartRate != null ? String(r.heartRate) : "--"),
     getStatus: (r) => {
-      const v = r.heartRate ?? 74;
+      const v = r.heartRate;
+      if (v == null) return "green";
       return v > 120 || v < 45 ? "red" : v > 100 || v < 55 ? "amber" : "green";
     },
   },
@@ -74,9 +77,10 @@ export const VITAL_METADATA: Record<string, VitalDisplayMeta> = {
     label: "Blood Oxygen (SpO₂)",
     unit: "%",
     icon: "💨",
-    getValue: (r) => String(r.spo2 ?? 97),
+    getValue: (r) => (r.spo2 != null ? String(r.spo2) : "--"),
     getStatus: (r) => {
-      const v = r.spo2 ?? 97;
+      const v = r.spo2;
+      if (v == null) return "green";
       return v < 90 ? "red" : v < 95 ? "amber" : "green";
     },
   },
@@ -86,8 +90,8 @@ export const VITAL_METADATA: Record<string, VitalDisplayMeta> = {
     label: "Kidney eGFR",
     unit: "mL/min",
     icon: "🧪",
-    getValue: () => "48",
-    getStatus: () => "amber",
+    getValue: () => "--",
+    getStatus: () => "green",
   },
   hba1c: {
     key: "hba1c",
@@ -95,8 +99,8 @@ export const VITAL_METADATA: Record<string, VitalDisplayMeta> = {
     label: "HbA1c",
     unit: "%",
     icon: "📊",
-    getValue: () => "7.4",
-    getStatus: () => "amber",
+    getValue: () => "--",
+    getStatus: () => "green",
   },
   weight: {
     key: "weight",
@@ -104,7 +108,7 @@ export const VITAL_METADATA: Record<string, VitalDisplayMeta> = {
     label: "Weight",
     unit: "kg",
     icon: "⚖️",
-    getValue: (r) => String(r.weight ?? 84.2),
+    getValue: (r) => (r.weight != null ? String(r.weight) : "--"),
     getStatus: () => "green",
   },
   peak_flow: {
@@ -113,7 +117,7 @@ export const VITAL_METADATA: Record<string, VitalDisplayMeta> = {
     label: "Peak Flow",
     unit: "L/min",
     icon: "🫁",
-    getValue: () => "420",
+    getValue: () => "--",
     getStatus: () => "green",
   },
 };

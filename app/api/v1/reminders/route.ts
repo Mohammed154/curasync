@@ -98,6 +98,11 @@ export async function GET(request: NextRequest) {
 
   const url = new URL(request.url);
   const statusFilter = url.searchParams.get("status");
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(authCtx.patientId);
+  if (!isUuid) {
+    return NextResponse.json({ data: [], meta: { total: 0 }, requestId, timestamp: new Date().toISOString() });
+  }
+
   const patId = authCtx.patientId as `${string}-${string}-${string}-${string}-${string}`;
 
   try {

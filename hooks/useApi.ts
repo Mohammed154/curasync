@@ -53,7 +53,7 @@ export async function postReading(payload: {
   type: BiometricType;
   value: number;
   unit: string;
-  source: "manual" | "apple_health" | "fitbit" | "garmin" | "ble";
+  source: "manual";
   recordedAt: string;
   notes?: string;
 }): Promise<{ success: boolean; alertCount: number; error?: string }> {

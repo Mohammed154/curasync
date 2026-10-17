@@ -7,7 +7,7 @@ import { eq, and, desc } from "drizzle-orm";
 import { db, medicationLogs, medications } from "@/lib/db";
 import { getPatientAuth, isNextResponse } from "@/lib/auth";
 import { writeAuditLog, getRequestMeta } from "@/lib/audit";
-import { getMockDashboardData } from "@/lib/mock-data";
+
 
 export const dynamic = "force-dynamic";
 
@@ -103,10 +103,13 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const medId = parsedLog.data.medicationId as `${string}-${string}-${string}-${string}-${string}`;
+    const isPatientUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(authCtx.patientId);
+    const isMedUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(parsedLog.data.medicationId);
+
     const [inserted] = await db.insert(medicationLogs).values({
-      medicationId:  medId,
-      patientId:     patId,
+      userId:        authCtx.userId,
+      medicationId:  isMedUuid ? (parsedLog.data.medicationId as `${string}-${string}-${string}-${string}-${string}`) : undefined,
+      patientId:     isPatientUuid ? (authCtx.patientId as `${string}-${string}-${string}-${string}-${string}`) : undefined,
       status:        parsedLog.data.status,
       scheduledAt:   new Date(parsedLog.data.scheduledAt),
       skippedReason: parsedLog.data.skippedReason,
@@ -160,26 +163,15 @@ export async function GET(request: NextRequest) {
       ...getRequestMeta(request),
     });
 
-    // If DB is configured and has rows, return them
-    if (rows.length > 0) {
-      return NextResponse.json({ data: rows, meta: { total: rows.length }, requestId, timestamp: new Date().toISOString() }, { status: 200 });
-    }
+    return NextResponse.json(
+      { data: rows, meta: { total: rows.length }, requestId, timestamp: new Date().toISOString() },
+      { status: 200 }
+    );
   } catch (err) {
     console.error("[medications] GET error:", err);
+    return NextResponse.json(
+      { data: [], meta: { total: 0 }, requestId, timestamp: new Date().toISOString() },
+      { status: 200 }
+    );
   }
-
-  // Fallback to mock medications if DB table is empty / in dev
-  const mockMeds = getMockDashboardData().todayMedications.map((m) => ({
-    id: m.id,
-    patientId: patId,
-    name: m.name,
-    dosage: m.dosage,
-    frequency: "once_daily",
-    conditionId: m.conditionId,
-    scheduledTimes: [m.scheduledAt],
-    active: true,
-    status: m.status,
-  }));
-
-  return NextResponse.json({ data: mockMeds, meta: { total: mockMeds.length }, requestId, timestamp: new Date().toISOString() }, { status: 200 });
 }

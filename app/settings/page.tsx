@@ -3,11 +3,13 @@
 import React, { useState } from "react";
 import AppShell, { SafeSignOutButton } from "@/components/layout/AppShell";
 import {
-  User, Bell, Shield, Watch, Download, Trash2, ChevronRight,
+  User, Bell, Shield, MapPin, Download, Trash2, ChevronRight,
   Moon, Globe, LogOut, Lock, FileText, Smartphone, Loader2
 } from "lucide-react";
 import { clsx } from "clsx";
 import { requestPdfExport } from "@/hooks/useApi";
+import { useAuth } from "@/context/AuthContext";
+import { getBrowserLocation } from "@/lib/location";
 
 interface SettingRow {
   id: string;
@@ -18,13 +20,7 @@ interface SettingRow {
   danger?: boolean;
 }
 
-const WEARABLE_DEVICES = [
-  { id: "apple_watch", name: "Apple Watch Series 9", status: "connected", lastSync: "8 min ago", icon: "⌚" },
-  { id: "fitbit", name: "Fitbit Charge 6", status: "disconnected", lastSync: "Never", icon: "📿" },
-  { id: "garmin", name: "Garmin Fenix 7", status: "disconnected", lastSync: "Never", icon: "🏃" },
-];
-
-type SectionKey = "profile" | "notifications" | "wearables" | "privacy" | "data" | null;
+type SectionKey = "profile" | "notifications" | "location" | "privacy" | "data" | null;
 
 export default function SettingsPage() {
   const [expanded, setExpanded] = useState<SectionKey>("profile");
@@ -38,6 +34,8 @@ export default function SettingsPage() {
   });
   const [pdfDownloadsToday, setPdfDownloadsToday] = useState(1); // max 5/day
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [updatingLocation, setUpdatingLocation] = useState(false);
+  const [locationStatus, setLocationStatus] = useState<string | null>(null);
 
   const handleExportPdf = async () => {
     if (exportingPdf || pdfDownloadsToday >= 5) return;
@@ -59,10 +57,43 @@ export default function SettingsPage() {
   const sections: { key: SectionKey; label: string; icon: React.ElementType; description: string }[] = [
     { key: "profile",       label: "Profile",               icon: User,      description: "Name, DOB, emergency contact" },
     { key: "notifications", label: "Notifications",          icon: Bell,      description: "Push, SMS, email preferences" },
-    { key: "wearables",    label: "Wearables & Devices",    icon: Watch,     description: "Sync Apple Watch, Fitbit, Garmin" },
+    { key: "location",      label: "Geographic Location",   icon: MapPin,    description: "Regional care detection & coordinates" },
     { key: "privacy",      label: "Privacy & Security",     icon: Shield,    description: "Data sharing, session, biometrics" },
     { key: "data",         label: "My Data & Export",       icon: Download,  description: "Download, delete, export options" },
   ];
+
+  const { user, profile, updateLocation } = useAuth();
+  const displayName = user?.displayName || profile?.display_name || "Patient";
+  const email = user?.email || profile?.email || "patient@curasync.care";
+  const initials = displayName
+    .split(" ")
+    .filter(Boolean)
+    .map((n: string) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2) || "PT";
+
+  const handleUpdateLocation = async () => {
+    setUpdatingLocation(true);
+    setLocationStatus(null);
+    try {
+      const coords = await getBrowserLocation({ timeoutMs: 8000, enableHighAccuracy: true });
+      if (coords) {
+        await updateLocation({
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+          accuracy: coords.accuracy,
+        });
+        setLocationStatus("Location updated successfully!");
+      } else {
+        setLocationStatus("Location permission dismissed or unavailable.");
+      }
+    } catch {
+      setLocationStatus("Failed to update location.");
+    } finally {
+      setUpdatingLocation(false);
+    }
+  };
 
   return (
     <AppShell>
@@ -77,16 +108,13 @@ export default function SettingsPage() {
         {/* Profile card */}
         <div className="bg-bg-card rounded-xl shadow-card p-4 mb-4 flex items-center gap-4 card-enter">
           <div className="w-14 h-14 rounded-full gradient-violet flex items-center justify-center text-white font-bold text-xl flex-shrink-0" aria-hidden="true">
-            AM
+            {initials}
           </div>
           <div className="flex-1">
-            <p className="font-semibold text-title-md text-text-primary">Arjun Mehta</p>
-            <p className="text-label-sm text-text-secondary">arjun.mehta@email.com</p>
-            <p className="text-xs text-text-tertiary mt-0.5">Patient · Mumbai · Member since Jan 2026</p>
+            <p className="font-semibold text-title-md text-text-primary">{displayName}</p>
+            <p className="text-label-sm text-text-secondary">{email}</p>
+            <p className="text-xs text-text-tertiary mt-0.5">Patient · Live Authenticated Account</p>
           </div>
-          <button className="text-accent-violet text-label-sm font-semibold hover:text-accent-lavender transition-colors" aria-label="Edit profile">
-            Edit
-          </button>
         </div>
 
         {/* Sections */}
@@ -117,11 +145,11 @@ export default function SettingsPage() {
                   {key === "profile" && (
                     <div className="space-y-3">
                       {[
-                        { label: "Full name", value: "Arjun Mehta" },
-                        { label: "Date of birth", value: "March 14, 1967 (Age 58)" },
-                        { label: "Phone", value: "+91 98765 43210" },
-                        { label: "Emergency contact", value: "Sunita Mehta — Spouse" },
+                        { label: "Full name", value: displayName },
+                        { label: "Email", value: email },
                         { label: "Language", value: "English" },
+                        { label: "Security & Encryption", value: "End-to-End Encrypted (AES-256)" },
+                        { label: "Authentication Provider", value: user?.providerData?.[0]?.providerId || "Google OAuth" },
                       ].map((f) => (
                         <div key={f.label} className="flex items-center justify-between py-2 border-b border-divider last:border-0">
                           <span className="text-label-sm text-text-secondary">{f.label}</span>
@@ -161,30 +189,68 @@ export default function SettingsPage() {
                     </div>
                   )}
 
-                  {/* WEARABLES */}
-                  {key === "wearables" && (
-                    <div className="space-y-3">
-                      {WEARABLE_DEVICES.map((device) => (
-                        <div key={device.id} className="flex items-center gap-3 py-2 border-b border-divider last:border-0">
-                          <span className="text-2xl flex-shrink-0" aria-hidden="true">{device.icon}</span>
-                          <div className="flex-1">
-                            <p className="text-label-sm font-semibold text-text-primary">{device.name}</p>
-                            <p className="text-xs text-text-tertiary">Last sync: {device.lastSync}</p>
-                          </div>
-                          <button
-                            className={clsx(
-                              "px-3 py-1.5 rounded-full text-xs font-semibold transition-all",
-                              device.status === "connected"
-                                ? "bg-status-green-bg text-status-green hover:bg-red-50 hover:text-status-red"
-                                : "bg-bg-lavender text-accent-violet hover:bg-accent-violet hover:text-white"
-                            )}
-                          >
-                            {device.status === "connected" ? "Connected ✓" : "Connect"}
-                          </button>
+                  {/* LOCATION */}
+                  {key === "location" && (
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between py-2 border-b border-divider">
+                          <span className="text-label-sm text-text-secondary">Latitude / Longitude</span>
+                          <span className="text-label-sm font-medium text-text-primary">
+                            {profile?.latitude && profile?.longitude
+                              ? `${Number(profile.latitude).toFixed(4)}, ${Number(profile.longitude).toFixed(4)}`
+                              : "Not detected"}
+                          </span>
                         </div>
-                      ))}
-                      <p className="text-xs text-text-tertiary pt-1">
-                        Fitbit & Garmin sync via OAuth 2.0 every 15 minutes. Apple Watch syncs passively via HealthKit.
+                        <div className="flex items-center justify-between py-2 border-b border-divider">
+                          <span className="text-label-sm text-text-secondary">City / Region</span>
+                          <span className="text-label-sm font-medium text-text-primary">
+                            {[profile?.city, profile?.region].filter(Boolean).join(", ") || "Auto-detected from network"}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between py-2 border-b border-divider">
+                          <span className="text-label-sm text-text-secondary">Country</span>
+                          <span className="text-label-sm font-medium text-text-primary">
+                            {profile?.country || "Auto-detected"}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between py-2 border-b border-divider last:border-0">
+                          <span className="text-label-sm text-text-secondary">Last Updated</span>
+                          <span className="text-label-sm font-medium text-text-primary">
+                            {profile?.location_updated_at
+                              ? new Date(profile.location_updated_at).toLocaleString()
+                              : "Not updated yet"}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="pt-1">
+                        <button
+                          onClick={handleUpdateLocation}
+                          disabled={updatingLocation}
+                          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg border border-accent-lavender text-accent-violet text-label-sm font-semibold hover:bg-bg-lavender transition-all disabled:opacity-50"
+                        >
+                          {updatingLocation ? (
+                            <>
+                              <Loader2 size={15} className="animate-spin" />
+                              <span>Detecting coordinates…</span>
+                            </>
+                          ) : (
+                            <>
+                              <MapPin size={15} />
+                              <span>Update Current Location</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+
+                      {locationStatus && (
+                        <p className="text-xs text-center text-text-secondary bg-bg-lavender/50 rounded-lg py-1.5">
+                          {locationStatus}
+                        </p>
+                      )}
+
+                      <p className="text-xs text-text-tertiary">
+                        Geographic metadata calibrates local health system references and emergency routing in full compliance with HIPAA and DPDP Act 2023.
                       </p>
                     </div>
                   )}

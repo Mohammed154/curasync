@@ -11,7 +11,7 @@ import {
 import { clsx } from "clsx";
 
 const FEATURES = [
-  { icon: Activity,    title: "Live Health Monitoring",  description: "Real-time biometric tracking from wearables and manual entry. Blood glucose, BP, weight — all in one dashboard.", color: "#00CEC9", bg: "#E6FAF9" },
+  { icon: Activity,    title: "Live Health Monitoring",  description: "Real-time biometric tracking from user-logged records. Blood glucose, BP, weight — all in one dashboard.", color: "#00CEC9", bg: "#E6FAF9" },
   { icon: Video,       title: "Live Video Consultations", description: "Encrypted HD telehealth video rooms. Connect with your specialist or care team right from the browser.", color: "#6C5CE7", bg: "#F0EFF8" },
   { icon: Brain,       title: "AI Doctor",               description: "Get instant, plain-language explanations of your readings and personalised questions to ask your care team.", color: "#A29BFE", bg: "#F0EFF8" },
   { icon: Pill,        title: "Medication Management",   description: "Never miss a dose. Smart reminders, adherence tracking, and drug-condition conflict alerts built in.", color: "#E84393", bg: "#FFF0F7" },
@@ -413,7 +413,7 @@ export default function HomePage() {
           <div style={{ borderRadius: 20, padding: 20, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)" }}>
             <p style={{ fontSize: 10, fontWeight: 600, color: "rgba(255,255,255,0.35)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 16 }}>Patient Panel · Live</p>
             {[
-              { name: "Arjun Mehta",  tags: "🩸 T2D · 💉 HTN · 🫘 CKD", adh: 87, status: "amber" },
+              { name: "Alex Rivera",  tags: "🩸 T2D · 💉 HTN · 🫘 CKD", adh: 87, status: "amber" },
               { name: "Priya Sharma", tags: "💉 HTN · 💨 Asthma",       adh: 64, status: "red"   },
               { name: "Rajesh Patel", tags: "🩸 T2D · 🦋 Hypothyroidism", adh: 96, status: "green" },
               { name: "Kavita Nair",  tags: "🦴 RA · 💉 HTN",            adh: 98, status: "green" },
@@ -467,7 +467,7 @@ export default function HomePage() {
             </Link>
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 20, fontSize: 12, color: "rgba(255,255,255,0.3)" }}>
-            {["🛡️ Secure & Encrypted","🏥 10+ Conditions","⌚ Apple Watch · Fitbit · Garmin"].map(t => (
+            {["🛡️ Secure & Encrypted","🏥 10+ Conditions","📍 Location-Aware Care"].map(t => (
               <span key={t}>{t}</span>
             ))}
           </div>
@@ -564,7 +564,7 @@ export default function HomePage() {
                 <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                   <div>
                     <h4 style={{ color: "#fff", fontWeight: 600, marginBottom: 6 }}>1. Information We Collect</h4>
-                    <p style={{ margin: 0 }}>We collect health metrics (such as blood glucose, blood pressure, oxygen levels), medication logs, and device data synced from Apple Watch, Fitbit, or Garmin, solely to display them on your dashboard.</p>
+                    <p style={{ margin: 0 }}>We collect health metrics (such as blood glucose, blood pressure, oxygen levels), medication logs, and geographic metadata, solely to display them on your dashboard and calibrate local emergency resources.</p>
                   </div>
                   <div>
                     <h4 style={{ color: "#fff", fontWeight: 600, marginBottom: 6 }}>2. Data Security & Storage</h4>

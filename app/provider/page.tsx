@@ -1,9 +1,8 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import AppShell from "@/components/layout/AppShell";
 import PatientRow from "@/components/provider/PatientRow";
-import { getMockProviderPanel } from "@/lib/mock-data";
 import type { ProviderPatientRow } from "@/types";
 import {
   Search,
@@ -13,7 +12,9 @@ import {
   TrendingUp,
   Download,
   Loader2,
+  UserPlus,
 } from "lucide-react";
+import Link from "next/link";
 import { clsx } from "clsx";
 import { requestPdfExport } from "@/hooks/useApi";
 
@@ -21,13 +22,32 @@ type SortKey = "alertCount" | "adherenceScore" | "name" | "lastActivityDate";
 type FilterStatus = "all" | "red" | "amber" | "green";
 
 export default function ProviderDashboardPage() {
-  const allPatients = useMemo(() => getMockProviderPanel(), []);
+  const [allPatients, setAllPatients] = useState<ProviderPatientRow[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   const [search, setSearch]       = useState("");
   const [sortKey, setSortKey]     = useState<SortKey>("alertCount");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [filter, setFilter]       = useState<FilterStatus>("all");
   const [exportingPdf, setExportingPdf] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/v1/patients")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json) => {
+        if (json?.data && Array.isArray(json.data)) {
+          setAllPatients(json.data);
+        } else {
+          setAllPatients([]);
+        }
+      })
+      .catch(() => {
+        setAllPatients([]);
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
+  }, []);
 
   const handleExportPdf = async () => {
     if (exportingPdf) return;
@@ -78,9 +98,9 @@ export default function ProviderDashboardPage() {
   // Stats summary
   const redCount   = allPatients.filter((p) => p.alertStatus === "red").length;
   const amberCount = allPatients.filter((p) => p.alertStatus === "amber").length;
-  const avgAdherence = Math.round(
-    allPatients.reduce((s, p) => s + p.adherenceScore, 0) / allPatients.length
-  );
+  const avgAdherence = allPatients.length > 0
+    ? Math.round(allPatients.reduce((s, p) => s + p.adherenceScore, 0) / allPatients.length)
+    : 100;
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -112,23 +132,32 @@ export default function ProviderDashboardPage() {
               Dr. Priya · {allPatients.length} patients assigned
             </p>
           </div>
-          <button
-            onClick={handleExportPdf}
-            disabled={exportingPdf}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg border border-divider bg-bg-card text-label-sm font-semibold text-text-secondary hover:text-accent-violet hover:border-accent-lavender disabled:opacity-50 transition-all shadow-card"
-          >
-            {exportingPdf ? (
-              <>
-                <Loader2 size={15} className="animate-spin" aria-hidden="true" />
-                <span className="hidden sm:inline">Exporting...</span>
-              </>
-            ) : (
-              <>
-                <Download size={15} aria-hidden="true" />
-                <span className="hidden sm:inline">Export PDF</span>
-              </>
-            )}
-          </button>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/provider/invite"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg gradient-violet text-white text-label-sm font-semibold shadow-card hover:opacity-90 transition-opacity"
+            >
+              <UserPlus size={15} />
+              <span className="hidden sm:inline">Invite Patients</span>
+            </Link>
+            <button
+              onClick={handleExportPdf}
+              disabled={exportingPdf}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg border border-divider bg-bg-card text-label-sm font-semibold text-text-secondary hover:text-accent-violet hover:border-accent-lavender disabled:opacity-50 transition-all shadow-card"
+            >
+              {exportingPdf ? (
+                <>
+                  <Loader2 size={15} className="animate-spin" aria-hidden="true" />
+                  <span className="hidden sm:inline">Exporting...</span>
+                </>
+              ) : (
+                <>
+                  <Download size={15} aria-hidden="true" />
+                  <span className="hidden sm:inline">Export PDF</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
 
         {/* ── Summary stat cards ───────────────────────────────────────────── */}
@@ -285,8 +314,31 @@ export default function ProviderDashboardPage() {
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center text-text-tertiary text-label-sm">
-                    No patients match your filters.
+                  <td colSpan={6} className="px-4 py-16 text-center text-text-tertiary">
+                    <div className="flex flex-col items-center justify-center gap-3 max-w-sm mx-auto">
+                      <div className="w-12 h-12 rounded-xl bg-accent-violet/10 text-accent-violet flex items-center justify-center">
+                        <Users size={24} />
+                      </div>
+                      <div>
+                        <p className="font-bold text-sm text-text-primary">
+                          {search ? "No matching patients found" : "No patients linked yet"}
+                        </p>
+                        <p className="text-xs text-text-secondary mt-1">
+                          {search
+                            ? "Try adjusting your search terms or filters."
+                            : "Your clinical panel does not have any active patients linked yet."}
+                        </p>
+                      </div>
+                      {!search && (
+                        <Link
+                          href="/provider/invite"
+                          className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg gradient-violet text-white text-xs font-semibold shadow-card hover:opacity-90"
+                        >
+                          <UserPlus size={14} />
+                          <span>Invite Patients</span>
+                        </Link>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ) : (

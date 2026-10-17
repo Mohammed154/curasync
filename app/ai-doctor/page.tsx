@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { ArrowLeft, Send, Mic, AlertTriangle } from "lucide-react";
 import { clsx } from "clsx";
-import { getMockDashboardData } from "@/lib/mock-data";
+import { useAuth } from "@/context/AuthContext";
 
 interface Message {
   id: string;
@@ -12,28 +12,6 @@ interface Message {
   content: string;
   timestamp: Date;
 }
-
-const PATIENT_CONTEXT = (() => {
-  const d = getMockDashboardData();
-  return `Patient: ${d.patient.name}, Age: ${2026 - parseInt(d.patient.dateOfBirth.slice(0,4))}.
-Conditions: ${d.patient.conditions.join(", ")}.
-Latest readings: Blood Glucose ${d.latestReadings.bloodGlucose} mg/dL, BP ${d.latestReadings.systolic}/${d.latestReadings.diastolic} mmHg, Weight ${d.latestReadings.weight} kg.
-Medications: ${d.todayMedications.map(m => `${m.name} ${m.dosage}`).join(", ")}.
-Weekly adherence: ${d.weeklyAdherence}%.`;
-})();
-
-const SYSTEM_PROMPT = `You are CuraSync's AI health assistant — a knowledgeable, empathetic health companion for patients managing chronic diseases. You have access to the patient's health context below.
-
-PATIENT CONTEXT:
-${PATIENT_CONTEXT}
-
-STRICT RULES:
-- You NEVER diagnose conditions or prescribe medications. Always recommend consulting their doctor for medical decisions.
-- You CAN explain what readings mean, describe conditions in plain language, suggest questions to ask their doctor, and summarise health trends.
-- Keep responses concise and warm — this patient may be unwell or anxious.
-- Always use plain English, not medical jargon, unless explaining a term.
-- If the patient seems distressed or describes an emergency, immediately direct them to call emergency services.
-- Do not store or reference any conversation history beyond this session.`;
 
 const SUGGESTED_PROMPTS = [
   "Daily health tips for a smooth lifestyle with chronic diseases",
@@ -44,6 +22,7 @@ const SUGGESTED_PROMPTS = [
 ];
 
 export default function AiDoctorPage() {
+  const { user, profile } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
@@ -54,6 +33,21 @@ export default function AiDoctorPage() {
   const abortRef = useRef<AbortController | null>(null);
 
   const RATE_LIMIT = 100;
+
+  const patientName = profile?.display_name || user?.displayName || "Patient";
+  const conditions = profile?.conditions?.length ? profile.conditions.join(", ") : "None recorded yet";
+
+  const systemPrompt = `You are CuraSync's AI health assistant — a knowledgeable, empathetic health companion for patients managing chronic diseases.
+Patient: ${patientName}.
+Tracked conditions: ${conditions}.
+
+STRICT RULES:
+- You NEVER diagnose conditions or prescribe medications. Always recommend consulting their doctor for medical decisions.
+- You CAN explain what readings mean, describe conditions in plain language, suggest questions to ask their doctor, and summarise health trends.
+- Keep responses concise and warm — this patient may be unwell or anxious.
+- Always use plain English, not medical jargon, unless explaining a term.
+- If the patient seems distressed or describes an emergency, immediately direct them to call emergency services.
+- Do not store or reference any conversation history beyond this session.`;
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -101,7 +95,7 @@ export default function AiDoctorPage() {
         body: JSON.stringify({
           model: "gemini-2.5-flash",
           max_tokens: 1000,
-          system: SYSTEM_PROMPT,
+          system: systemPrompt,
           stream: true,
           messages: history,
         }),
@@ -226,8 +220,8 @@ export default function AiDoctorPage() {
           </div>
 
           <h1 className="text-white font-bold text-3xl text-center mb-1 leading-tight">
-            Hey, Arjun 👋<br />
-            <span className="text-white/70 font-normal text-xl">How can I help you?</span>
+            Hello 👋<br />
+            <span className="text-white/70 font-normal text-xl">How can I help you today?</span>
           </h1>
           <p className="text-white/40 text-sm text-center max-w-xs mb-3">
             Ask me about your readings, conditions, medications, or what to discuss with your doctor.

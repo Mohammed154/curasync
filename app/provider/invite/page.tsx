@@ -6,14 +6,18 @@ import { Copy, Check, QrCode, Share2, Link, Users, ShieldCheck, Clock, Mail } fr
 import { clsx } from "clsx";
 import { format, addDays } from "date-fns";
 
-// Mock invite codes — in production these are generated server-side as JWT tokens
-// with 7-day expiry, stored in Supabase invite_codes table
-const MOCK_EXISTING_INVITES = [
-  { code: "CC-ARJUN-7K2M", patientId: "pat_001", patientName: "Arjun Mehta", createdAt: new Date(), expiresAt: addDays(new Date(), 7), status: "pending", usedAt: null },
-];
+interface PatientInvite {
+  code: string;
+  patientId: string;
+  patientName: string;
+  createdAt: Date;
+  expiresAt: Date;
+  status: string;
+  usedAt: Date | null;
+}
 
 export default function ProviderInvitePage() {
-  const [invites, setInvites] = useState(MOCK_EXISTING_INVITES);
+  const [invites, setInvites] = useState<PatientInvite[]>([]);
   const [newCode, setNewCode] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [emailInput, setEmailInput] = useState("");

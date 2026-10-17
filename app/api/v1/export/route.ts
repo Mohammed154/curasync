@@ -3,7 +3,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { nanoid } from "nanoid";
 import { eq, and, gte, lte, desc } from "drizzle-orm";
-import { db, patientProfiles, readings, medications, alertEvents } from "@/lib/db";
+import { db, profiles, vitals, patientProfiles, readings, medications, alertEvents } from "@/lib/db";
 import { getPatientAuth, isNextResponse } from "@/lib/auth";
 import { checkRateLimit, pdfLimiter } from "@/lib/ratelimit";
 import { writeAuditLog, getRequestMeta } from "@/lib/audit";
@@ -18,45 +18,7 @@ export async function GET(request: NextRequest) {
   const rangeStart = searchParams.get("rangeStart") ?? format(subDays(new Date(), 30), "yyyy-MM-dd");
   const rangeEnd   = searchParams.get("rangeEnd")   ?? format(new Date(), "yyyy-MM-dd");
 
-  // In development or test environments, invoke Supabase Edge Function with resilient fallback
-  if (process.env.NEXT_PUBLIC_APP_ENV === "development") {
-    const fallbackPreviewUrl = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/pdf-preview?patientId=mock-patient-id&rangeStart=${rangeStart}&rangeEnd=${rangeEnd}`;
-    let generatedPdfUrl: string | null = null;
 
-    try {
-      generatedPdfUrl = await invokeSupabasePdfExport({
-        patientId: "mock-patient-id",
-        rangeStart,
-        rangeEnd,
-        patientName: "Alex Rivera",
-        conditions: ["Type 2 Diabetes", "Hypertension"],
-        reportId: requestId,
-        previewUrl: fallbackPreviewUrl,
-      });
-    } catch (err) {
-      console.warn("[export] Supabase Edge Function invocation fallback to /pdf-preview:", err);
-      generatedPdfUrl = fallbackPreviewUrl;
-    }
-
-    const mockPayload = {
-      reportId: nanoid(),
-      generatedAt: new Date().toISOString(),
-      patientId: "mock-patient-id",
-      patientName: "Alex Rivera",
-      dateRange: { start: rangeStart, end: rangeEnd },
-      conditions: ["Type 2 Diabetes", "Hypertension"],
-      readingCount: 45,
-      medicationCount: 3,
-      activeAlertCount: 2,
-      downloadsRemaining: 4,
-      pdfUrl: generatedPdfUrl,
-    };
-
-    return NextResponse.json(
-      { data: mockPayload, downloadsRemaining: 4, requestId, timestamp: new Date().toISOString() },
-      { status: 200, headers: { "X-Request-Id": requestId, "X-RateLimit-Remaining": "4" } }
-    );
-  }
 
   const authCtx = await getPatientAuth(request);
   if (isNextResponse(authCtx)) return authCtx;
@@ -70,17 +32,43 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const patId = authCtx.patientId as `${string}-${string}-${string}-${string}-${string}`;
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(authCtx.patientId);
 
-  // Fetch all data for the report period
-  const [patient] = await db.select().from(patientProfiles).where(eq(patientProfiles.id, patId)).limit(1);
-  if (!patient) return NextResponse.json({ error: "Patient not found", code: "NOT_FOUND", requestId }, { status: 404 });
+  let patientName = "Patient";
+  let patientConditions: string[] = [];
+  let recentReadings: any[] = [];
+  let activeMeds: any[] = [];
+  let activeAlerts: any[] = [];
 
-  const [recentReadings, activeMeds, activeAlerts] = await Promise.all([
-    db.select().from(readings).where(and(eq(readings.patientId, patId), gte(readings.recordedAt, new Date(rangeStart)), lte(readings.recordedAt, new Date(rangeEnd)))).orderBy(desc(readings.recordedAt)).limit(500),
-    db.select().from(medications).where(and(eq(medications.patientId, patId), eq(medications.active, true))),
-    db.select().from(alertEvents).where(and(eq(alertEvents.patientId, patId), eq(alertEvents.status, "active"))),
-  ]);
+  if (isUuid) {
+    const patId = authCtx.patientId as `${string}-${string}-${string}-${string}-${string}`;
+    const [patient] = await db.select().from(patientProfiles).where(eq(patientProfiles.id, patId)).limit(1);
+    if (!patient) return NextResponse.json({ error: "Patient not found", code: "NOT_FOUND", requestId }, { status: 404 });
+    patientName = patient.name;
+    patientConditions = patient.conditions;
+
+    const [rReadings, aMeds, aAlerts] = await Promise.all([
+      db.select().from(readings).where(and(eq(readings.patientId, patId), gte(readings.recordedAt, new Date(rangeStart)), lte(readings.recordedAt, new Date(rangeEnd)))).orderBy(desc(readings.recordedAt)).limit(500),
+      db.select().from(medications).where(and(eq(medications.patientId, patId), eq(medications.active, true))),
+      db.select().from(alertEvents).where(and(eq(alertEvents.patientId, patId), eq(alertEvents.status, "active"))),
+    ]);
+    recentReadings = rReadings;
+    activeMeds = aMeds;
+    activeAlerts = aAlerts;
+  } else {
+    const [userProf] = await db.select().from(profiles).where(eq(profiles.id, authCtx.userId)).limit(1);
+    if (!userProf) return NextResponse.json({ error: "Profile not found", code: "NOT_FOUND", requestId }, { status: 404 });
+    patientName = userProf.displayName || "Patient";
+    patientConditions = userProf.conditions || [];
+
+    const vReadings = await db
+      .select()
+      .from(vitals)
+      .where(and(eq(vitals.userId, authCtx.userId), gte(vitals.recordedAt, new Date(rangeStart)), lte(vitals.recordedAt, new Date(rangeEnd))))
+      .orderBy(desc(vitals.recordedAt))
+      .limit(500);
+    recentReadings = vReadings;
+  }
 
   // Audit log — PDF exports are high-sensitivity events
   void writeAuditLog({ actorId: authCtx.clerkUserId, action: "EXPORT", resource: "patient_report", patientId: authCtx.patientId, ...getRequestMeta(request) });
@@ -94,8 +82,8 @@ export async function GET(request: NextRequest) {
       patientId: authCtx.patientId,
       rangeStart,
       rangeEnd,
-      patientName: patient.name,
-      conditions: patient.conditions,
+      patientName,
+      conditions: patientConditions,
       reportId: requestId,
       previewUrl: fallbackPreviewUrl,
     });
@@ -108,9 +96,9 @@ export async function GET(request: NextRequest) {
     reportId: nanoid(),
     generatedAt: new Date().toISOString(),
     patientId: authCtx.patientId,
-    patientName: patient.name,
+    patientName,
     dateRange: { start: rangeStart, end: rangeEnd },
-    conditions: patient.conditions,
+    conditions: patientConditions,
     readingCount: recentReadings.length,
     medicationCount: activeMeds.length,
     activeAlertCount: activeAlerts.length,

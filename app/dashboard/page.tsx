@@ -8,19 +8,23 @@ import MedicationCard from "@/components/patient/MedicationCard";
 import GlucoseChart from "@/components/charts/GlucoseChart";
 import LogReadingModal from "@/components/modals/LogReadingModal";
 import WeeklySummaryCard, { DEFAULT_WEEKLY_SUMMARY } from "@/components/dashboard/WeeklySummaryCard";
-import UpcomingRemindersStrip, { MOCK_UPCOMING_DOSES } from "@/components/dashboard/UpcomingRemindersStrip";
+import UpcomingRemindersStrip, { type UpcomingDose } from "@/components/dashboard/UpcomingRemindersStrip";
 import AdherenceStreakCard from "@/components/patient/AdherenceStreakCard";
 import ConditionTile from "@/components/patient/ConditionTile";
-import { getMockDashboardData } from "@/lib/mock-data";
+import { conditionColors } from "@/lib/design-tokens";
 import { getRelevantVitalKeysForConditions, VITAL_METADATA } from "@/lib/condition-vitals-map";
 import { useReadings, useAlerts, useMedications, patchAlert, logDose as apiLogDose } from "@/hooks/useApi";
-import type { DashboardData, Alert, TodayMedication, ConditionId, SparklinePoint, LatestReadings } from "@/types";
+import { useAuth } from "@/context/AuthContext";
+import type { DashboardData, Alert, TodayMedication, ConditionId, SparklinePoint, LatestReadings, ConditionSummary } from "@/types";
 import { format } from "date-fns";
 import Link from "next/link";
-import { RefreshCw, PlusCircle, ChevronDown, ChevronUp, Video } from "lucide-react";
+import { RefreshCw, PlusCircle, ChevronDown, ChevronUp, Video, MapPin, CheckCircle2, X, Loader2, ShieldAlert, UserPlus, Lock, Stethoscope } from "lucide-react";
+import { getBrowserLocation } from "@/lib/location";
+import { useDoctorConnection } from "@/hooks/useDoctorConnection";
+import DoctorConnectionModal from "@/components/telehealth/DoctorConnectionModal";
 
 export default function DashboardPage() {
-  const initialMock = useMemo(() => getMockDashboardData(), []);
+  const { user, profile, updateLocation } = useAuth();
 
   // ── SWR Live Data Hooks ──────────────────────────────────────────────────
   const { data: readingsData, mutate: mutateReadings, isValidating: isReadingsValidating } = useReadings(undefined, 100);
@@ -30,15 +34,81 @@ export default function DashboardPage() {
   // Local optimistic overrides
   const [dismissedAlertIds, setDismissedAlertIds] = useState<Set<string>>(() => new Set());
   const [localMedStatuses, setLocalMedStatuses] = useState<Record<string, TodayMedication["status"]>>({});
-  const [upcomingDoses, setUpcomingDoses] = useState(() => MOCK_UPCOMING_DOSES);
+  const [upcomingDoses, setUpcomingDoses] = useState<UpcomingDose[]>([]);
   const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [logModalOpen, setLogModalOpen] = useState(false);
   const [showMoreWidgets, setShowMoreWidgets] = useState(false);
 
-  // ── Derive Live Biometrics from DB Readings with Fallbacks ───────────────
+  // Polite Geolocation banner on first dashboard access
+  const [showLocationBanner, setShowLocationBanner] = useState(false);
+  const [locationLoading, setLocationLoading] = useState(false);
+  const [locationSuccess, setLocationSuccess] = useState<string | null>(null);
+
+  // Doctor connection & presence
+  const {
+    connected: isDoctorConnected,
+    provider: doctorInfo,
+    isDoctorOnline,
+    connectDoctor,
+    mutate: mutateDoctorConnection,
+  } = useDoctorConnection();
+  const [connectModalOpen, setConnectModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (!profile?.latitude && !profile?.city) {
+      if (typeof window !== "undefined") {
+        const dismissed = window.sessionStorage.getItem("curasync_location_dismissed");
+        if (!dismissed) {
+          setShowLocationBanner(true);
+        }
+      }
+    }
+  }, [profile]);
+
+  const handleAllowLocation = async () => {
+    setLocationLoading(true);
+    try {
+      const coords = await getBrowserLocation({ timeoutMs: 7000 });
+      if (coords) {
+        await updateLocation({
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+          accuracy: coords.accuracy,
+        });
+        setLocationSuccess("Location calibrated successfully!");
+        setTimeout(() => setShowLocationBanner(false), 1800);
+      } else {
+        if (typeof window !== "undefined") {
+          window.sessionStorage.setItem("curasync_location_dismissed", "true");
+        }
+        setShowLocationBanner(false);
+      }
+    } catch {
+      setShowLocationBanner(false);
+    } finally {
+      setLocationLoading(false);
+    }
+  };
+
+  const handleDismissLocation = () => {
+    if (typeof window !== "undefined") {
+      window.sessionStorage.setItem("curasync_location_dismissed", "true");
+    }
+    setShowLocationBanner(false);
+  };
+
+  // ── Derive Live Biometrics from DB Readings ─────────────────────────────
   const latestReadings: LatestReadings = useMemo(() => {
-    const base = { ...initialMock.latestReadings };
+    const base: LatestReadings = {
+      bloodGlucose: null as any,
+      systolic: null as any,
+      diastolic: null as any,
+      heartRate: null as any,
+      spo2: null as any,
+      weight: null as any,
+      lastSyncedAt: new Date().toISOString(),
+    };
     if (!readingsData || readingsData.length === 0) return base;
 
     const seenTypes = new Set<string>();
@@ -74,12 +144,12 @@ export default function DashboardPage() {
 
     base.lastSyncedAt = readingsData[0]?.recordedAt || base.lastSyncedAt;
     return base;
-  }, [readingsData, initialMock.latestReadings]);
+  }, [readingsData]);
 
   // ── Derive Primary Condition Sparkline Points from DB Readings ───────────
   const recentReadings: SparklinePoint[] = useMemo(() => {
     if (!readingsData || readingsData.length === 0) {
-      return initialMock.recentReadings;
+      return [];
     }
 
     const glucoseReadings = readingsData
@@ -88,7 +158,7 @@ export default function DashboardPage() {
       .reverse();
 
     if (glucoseReadings.length === 0) {
-      return initialMock.recentReadings;
+      return [];
     }
 
     return glucoseReadings.map((r: any) => {
@@ -101,7 +171,7 @@ export default function DashboardPage() {
         value: Math.round(parseFloat(r.value)),
       };
     });
-  }, [readingsData, initialMock.recentReadings]);
+  }, [readingsData]);
 
   // ── Derive Today's Medications from DB or Mock ───────────────────────────
   const todayMedications: TodayMedication[] = useMemo(() => {
@@ -117,7 +187,7 @@ export default function DashboardPage() {
         conditionId: (m.conditionId as ConditionId) || "diabetes_t2",
       }));
     } else {
-      sourceList = initialMock.todayMedications;
+      sourceList = [];
     }
 
     // Apply local optimistic overrides
@@ -125,13 +195,13 @@ export default function DashboardPage() {
       const localStatus = localMedStatuses[med.id];
       return localStatus ? { ...med, status: localStatus } : med;
     });
-  }, [medicationsData, localMedStatuses, initialMock.todayMedications]);
+  }, [medicationsData, localMedStatuses]);
 
   // ── Active Alerts with Dismiss Filter ────────────────────────────────────
   const activeAlerts: Alert[] = useMemo(() => {
-    const rawList = alertsData ?? initialMock.activeAlerts;
+    const rawList = alertsData ?? [];
     return rawList.filter((a) => !dismissedAlertIds.has(a.id));
-  }, [alertsData, dismissedAlertIds, initialMock.activeAlerts]);
+  }, [alertsData, dismissedAlertIds]);
 
   // ── Manual & Background Refresh ─────────────────────────────────────────
   const refresh = useCallback(async () => {
@@ -199,12 +269,39 @@ export default function DashboardPage() {
     }
   };
 
-  const { patient, conditionSummaries, weeklyAdherence, streakDays } = initialMock;
+  const patientConditions = (profile?.conditions && profile.conditions.length > 0)
+    ? (profile.conditions as ConditionId[])
+    : [];
+
+  const patientDisplayName = profile?.display_name || user?.displayName || "Patient";
+
+  const conditionSummaries = useMemo<ConditionSummary[]>(() => {
+    return patientConditions.map((cId) => {
+      const cfg = conditionColors[cId];
+      return {
+        conditionId: cId,
+        label: cfg?.label ?? cId,
+        metricLabel: "Status",
+        metricValue: "Stable",
+        unit: "",
+        trend: "stable",
+        status: "green",
+        color: cfg?.accent ?? "#6C5CE7",
+        bgColor: cfg?.bg ?? "#F0EFF8",
+        iconEmoji: cfg?.emoji ?? "🩺",
+      };
+    });
+  }, [patientConditions]);
+
+  const weeklyAdherence = todayMedications.length > 0
+    ? Math.round((todayMedications.filter((m) => m.status === "taken").length / todayMedications.length) * 100)
+    : 100;
+  const streakDays = 0;
 
   // ── Condition-derived relevant vitals (Capped at 4) ───────────────────────
   const relevantVitalKeys = useMemo(
-    () => getRelevantVitalKeysForConditions(patient.conditions, 4),
-    [patient.conditions]
+    () => getRelevantVitalKeysForConditions(patientConditions, 4),
+    [patientConditions]
   );
 
   return (
@@ -215,25 +312,54 @@ export default function DashboardPage() {
         <div className="flex items-start justify-between gap-4 animate-fade-in">
           <div>
             <h1 className="font-bold text-display text-text-primary leading-tight">
-              Hey, {patient.name.split(" ")[0]} 👋
+              Hey, {patientDisplayName.split(" ")[0]} 👋
             </h1>
-            <p className="text-body-md text-text-secondary mt-1">
-              {format(new Date(), "EEEE, MMMM d")} · Managing{" "}
-              <span className="font-semibold text-accent-violet">
-                {patient.conditions.length} conditions
-              </span>
-            </p>
+            <div className="flex items-center gap-2 flex-wrap mt-1">
+              <p className="text-body-md text-text-secondary">
+                {format(new Date(), "EEEE, MMMM d")} · Managing{" "}
+                <span className="font-semibold text-accent-violet">
+                  {patientConditions.length} conditions
+                </span>
+              </p>
+              {profile?.city && (
+                <span className="inline-flex items-center gap-1 text-xs text-text-secondary bg-bg-card border border-divider px-2.5 py-0.5 rounded-full shadow-xs">
+                  <MapPin size={11} className="text-accent-violet" />
+                  {[profile.city, profile.country].filter(Boolean).join(", ")}
+                </span>
+              )}
+            </div>
           </div>
 
           <div className="flex items-center gap-2 flex-shrink-0">
             {/* Live Video Consultation action */}
-            <Link
-              href="/telehealth"
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-status-green hover:opacity-90 text-white text-label-sm font-bold shadow-card transition-all"
-            >
-              <Video size={15} aria-hidden="true" />
-              <span>Video Call</span>
-            </Link>
+            {!isDoctorConnected ? (
+              <button
+                onClick={() => setConnectModalOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-text-secondary text-label-sm font-bold border border-divider shadow-xs transition-all active:scale-95"
+                title="Connect with your doctor to enable video calls"
+              >
+                <Lock size={14} className="text-text-tertiary" />
+                <span>Video Call</span>
+              </button>
+            ) : !isDoctorOnline ? (
+              <Link
+                href="/telehealth"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-text-tertiary text-label-sm font-medium border border-divider shadow-xs transition-all"
+                title="Dr. Priya Sharma is offline. Click to schedule an upcoming visit."
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-gray-400" />
+                <span>Doctor Offline</span>
+              </Link>
+            ) : (
+              <Link
+                href="/telehealth"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-status-green hover:opacity-90 text-white text-label-sm font-bold shadow-card transition-all"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                <Video size={15} aria-hidden="true" />
+                <span>Video Call</span>
+              </Link>
+            )}
 
             {/* Manual refresh */}
             <button
@@ -259,35 +385,155 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* ── Live Telehealth Video Call Banner ─────────────────────────────── */}
-        <section aria-label="Live Video Consultation">
-          <div className="rounded-2xl p-4 sm:p-5 bg-gradient-to-r from-[#1B1238] via-[#0F172A] to-[#0A2522] border border-violet-800/40 shadow-card flex flex-col sm:flex-row sm:items-center justify-between gap-4 card-enter">
-            <div className="flex items-center gap-3.5">
-              <div className="w-11 h-11 rounded-xl gradient-violet flex items-center justify-center text-white flex-shrink-0 shadow-md">
-                <Video size={20} />
+        {/* ── Polite Geolocation Permission Banner ────────────────────────── */}
+        {showLocationBanner && (
+          <div className="bg-gradient-to-r from-bg-lavender via-white to-bg-lavender/40 border border-accent-lavender rounded-2xl p-4 shadow-card flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 card-enter animate-fade-in">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl gradient-violet text-white flex items-center justify-center flex-shrink-0 shadow-xs">
+                <MapPin size={18} />
               </div>
               <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="font-bold text-sm text-white">Live Clinical Consultation</h2>
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-bold">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                    Doctor Ready
-                  </span>
-                </div>
-                <p className="text-xs text-slate-300 mt-0.5">
-                  Dr. Priya Sharma is available for your chronic care telehealth consultation.
+                <p className="font-semibold text-label-sm text-text-primary">
+                  Enable Location for Regional Care?
+                </p>
+                <p className="text-xs text-text-secondary mt-0.5">
+                  CuraSync calibrates emergency medical routing, regional contacts, and local clinical ranges to your geographic area.
                 </p>
               </div>
             </div>
-            <Link
-              href="/telehealth"
-              className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-status-green hover:opacity-90 text-white font-bold text-xs shadow-md transition-all active:scale-95 flex-shrink-0"
-            >
-              <Video size={14} />
-              <span>Start Live Video Call</span>
-            </Link>
+
+            <div className="flex items-center gap-2 self-end sm:self-center flex-shrink-0">
+              {locationSuccess ? (
+                <div className="flex items-center gap-1.5 text-xs text-status-green font-semibold bg-status-green-bg px-3 py-1.5 rounded-lg border border-status-green/30">
+                  <CheckCircle2 size={14} />
+                  <span>{locationSuccess}</span>
+                </div>
+              ) : (
+                <>
+                  <button
+                    onClick={handleDismissLocation}
+                    className="px-3 py-1.5 rounded-lg text-xs font-semibold text-text-tertiary hover:text-text-secondary hover:bg-bg-light transition-all"
+                  >
+                    Not Now
+                  </button>
+                  <button
+                    onClick={handleAllowLocation}
+                    disabled={locationLoading}
+                    className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg gradient-violet text-white text-xs font-semibold shadow-xs hover:opacity-90 transition-all disabled:opacity-50"
+                  >
+                    {locationLoading ? (
+                      <>
+                        <Loader2 size={13} className="animate-spin" />
+                        <span>Detecting…</span>
+                      </>
+                    ) : (
+                      <>
+                        <MapPin size={13} />
+                        <span>Allow Location</span>
+                      </>
+                    )}
+                  </button>
+                </>
+              )}
+            </div>
           </div>
-        </section>
+        )}
+
+        {/* ── Live Telehealth Video Call Banner ─────────────────────────────── */}
+        {!isDoctorConnected ? (
+          <section aria-label="Clinical Telehealth Connection">
+            <div className="rounded-2xl p-4 sm:p-5 bg-gradient-to-r from-[#1B1238] via-[#1E1B4B] to-[#172554] border border-violet-800/40 shadow-card flex flex-col sm:flex-row sm:items-center justify-between gap-4 card-enter">
+              <div className="flex items-center gap-3.5">
+                <div className="w-11 h-11 rounded-xl bg-violet-500/20 text-violet-300 flex items-center justify-center flex-shrink-0 shadow-md">
+                  <ShieldAlert size={20} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="font-bold text-sm text-white">Telehealth Video Consultations</h2>
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-bold">
+                      Doctor Connection Required
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-300 mt-0.5">
+                    Live video visits are restricted strictly to verified doctor-patient relationships. Connect with your primary care provider to unlock appointments and instant sessions.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setConnectModalOpen(true)}
+                className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl gradient-violet text-white font-bold text-xs shadow-md transition-all active:scale-95 flex-shrink-0"
+              >
+                <UserPlus size={14} />
+                <span>Connect with Doctor</span>
+              </button>
+            </div>
+          </section>
+        ) : !isDoctorOnline ? (
+          <section aria-label="Live Video Consultation">
+            <div className="rounded-2xl p-4 sm:p-5 bg-gradient-to-r from-[#1B1238] via-[#0F172A] to-[#1E293B] border border-slate-700/40 shadow-card flex flex-col sm:flex-row sm:items-center justify-between gap-4 card-enter">
+              <div className="flex items-center gap-3.5">
+                <div className="w-11 h-11 rounded-xl bg-slate-800 flex items-center justify-center text-slate-300 flex-shrink-0 shadow-md">
+                  <Stethoscope size={20} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="font-bold text-sm text-white">{doctorInfo.name} · Telehealth</h2>
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gray-500/20 text-gray-300 text-[10px] font-medium">
+                      <span className="w-1.5 h-1.5 rounded-full bg-gray-400" />
+                      Doctor Currently Offline
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-300 mt-0.5">
+                    Instant video calling is paused while your physician is away. Book an upcoming appointment or message their clinical team.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <Link
+                  href="/messages"
+                  className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition-colors"
+                >
+                  Message Doctor
+                </Link>
+                <Link
+                  href="/telehealth"
+                  className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl gradient-violet text-white font-bold text-xs shadow-md transition-all active:scale-95 flex-shrink-0"
+                >
+                  <span>Schedule Visit</span>
+                </Link>
+              </div>
+            </div>
+          </section>
+        ) : (
+          <section aria-label="Live Video Consultation">
+            <div className="rounded-2xl p-4 sm:p-5 bg-gradient-to-r from-[#1B1238] via-[#0F172A] to-[#0A2522] border border-violet-800/40 shadow-card flex flex-col sm:flex-row sm:items-center justify-between gap-4 card-enter">
+              <div className="flex items-center gap-3.5">
+                <div className="w-11 h-11 rounded-xl gradient-violet flex items-center justify-center text-white flex-shrink-0 shadow-md">
+                  <Video size={20} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="font-bold text-sm text-white">Live Clinical Consultation</h2>
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-bold">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      Doctor Ready
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-300 mt-0.5">
+                    {doctorInfo.name} is available for your chronic care telehealth consultation.
+                  </p>
+                </div>
+              </div>
+              <Link
+                href="/telehealth"
+                className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-status-green hover:opacity-90 text-white font-bold text-xs shadow-md transition-all active:scale-95 flex-shrink-0"
+              >
+                <Video size={14} />
+                <span>Start Live Video Call</span>
+              </Link>
+            </div>
+          </section>
+        )}
 
         {/* ── 2. Hero Vitals Row (Condition-derived, Max 4) ─────────────────── */}
         <section aria-label="Hero Vitals">
@@ -382,6 +628,18 @@ export default function DashboardPage() {
             void mutateReadings();
             void mutateAlerts();
           }}
+        />
+
+        {/* ── Doctor Connection Modal ─────────────────────────────────────── */}
+        <DoctorConnectionModal
+          open={connectModalOpen}
+          onClose={() => setConnectModalOpen(false)}
+          onConnected={() => {
+            void mutateDoctorConnection();
+          }}
+          doctorName={doctorInfo.name}
+          specialty={doctorInfo.specialty}
+          onConnect={connectDoctor}
         />
       </div>
     </AppShell>

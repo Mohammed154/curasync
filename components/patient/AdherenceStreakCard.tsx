@@ -6,16 +6,17 @@ import { Flame, Trophy } from "lucide-react";
 interface AdherenceStreakCardProps {
   weeklyAdherence: number; // 0–100
   streakDays: number;
+  weekDays?: boolean[];
 }
 
 const DAYS = ["M", "T", "W", "T", "F", "S", "S"];
-// Mock: last 7 days adherence (true = full, false = partial/missed)
-const MOCK_WEEK = [true, true, true, true, false, true, true];
 
 export default function AdherenceStreakCard({
   weeklyAdherence,
   streakDays,
+  weekDays,
 }: AdherenceStreakCardProps) {
+  const activeDays = weekDays ?? Array.from({ length: 7 }, (_, i) => i < streakDays);
   const circumference = 2 * Math.PI * 26; // r=26
   const offset = circumference - (weeklyAdherence / 100) * circumference;
 
@@ -75,12 +76,12 @@ export default function AdherenceStreakCard({
                 <div
                   className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold"
                   style={{
-                    background: MOCK_WEEK[i] ? "#00B894" : "#F0EFF8",
-                    color: MOCK_WEEK[i] ? "#fff" : "#8888A8",
+                    background: activeDays[i] ? "#00B894" : "#F0EFF8",
+                    color: activeDays[i] ? "#fff" : "#8888A8",
                   }}
-                  aria-label={`${day}: ${MOCK_WEEK[i] ? "taken" : "missed"}`}
+                  aria-label={`${day}: ${activeDays[i] ? "taken" : "missed"}`}
                 >
-                  {MOCK_WEEK[i] ? "✓" : day}
+                  {activeDays[i] ? "✓" : day}
                 </div>
               </div>
             ))}

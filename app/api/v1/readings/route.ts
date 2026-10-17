@@ -19,7 +19,7 @@ const ReadingSchema = z.object({
   type:       BiometricTypeEnum,
   value:      z.number().finite(),
   unit:       z.string().min(1).max(20),
-  source:     z.enum(["manual","apple_health","fitbit","garmin","ble"]),
+  source:     z.literal("manual").default("manual"),
   recordedAt: z.string().datetime(),
   notes:      z.string().max(500).optional(),
 });
@@ -73,34 +73,83 @@ export async function POST(request: NextRequest) {
     }
   } else {
     try {
-      const { db, readings, alertEvents } = await import("@/lib/db");
-      const patId = authCtx.patientId as `${string}-${string}-${string}-${string}-${string}`;
+      const { db, vitals, glucoseReadings, profiles } = await import("@/lib/db");
+      const { eq } = await import("drizzle-orm");
+      const recDate = new Date(recordedAt);
 
-      const [inserted] = await db.insert(readings).values({
-        patientId:  patId,
+      // 1. Insert into public.vitals table (user_id is TEXT referencing public.profiles(id))
+      const [insertedVital] = await db.insert(vitals).values({
+        userId:     authCtx.userId,
         type,
         value:      String(value),
         unit,
         source,
-        recordedAt: new Date(recordedAt),
-        notes,
+        recordedAt: recDate,
+        notes:      notes || undefined,
       }).returning();
 
-      insertedId = inserted?.id ?? insertedId;
+      if (insertedVital?.id) {
+        insertedId = insertedVital.id;
+      }
 
-      if (triggeredAlerts.length > 0) {
-        await db.insert(alertEvents).values(
-          triggeredAlerts.map((a) => ({
-            patientId:   patId,
-            severity:    a.severity,
-            status:      "active" as const,
-            type:        a.type,
-            message:     a.message,
-            value:       a.value !== undefined ? String(a.value) : undefined,
-            threshold:   a.threshold !== undefined ? String(a.threshold) : undefined,
-            triggeredAt: new Date(a.triggeredAt),
-          }))
-        );
+      // 2. If blood_glucose, sync to public.glucose_readings as well
+      if (type === "blood_glucose") {
+        let mealContext = "fasting";
+        if (notes) {
+          const lowerNotes = notes.toLowerCase();
+          if (lowerNotes.includes("post-meal") || lowerNotes.includes("post meal") || lowerNotes.includes("after meal")) {
+            mealContext = "post_meal";
+          } else if (lowerNotes.includes("evening") || lowerNotes.includes("bedtime")) {
+            mealContext = "bedtime";
+          } else if (lowerNotes.includes("random")) {
+            mealContext = "random";
+          }
+        }
+
+        await db.insert(glucoseReadings).values({
+          userId:      authCtx.userId,
+          value:       String(value),
+          unit:        unit || "mg/dL",
+          mealContext,
+          source,
+          notes:       notes || undefined,
+          recordedAt:  recDate,
+        }).catch((e) => console.warn("[readings] glucoseReadings insert warning:", e));
+      }
+
+      // 3. Backward compatibility: if patientId is a valid UUID, attempt inserting into legacy readings table
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(authCtx.patientId);
+      if (isUuid) {
+        try {
+          const { readings, alertEvents } = await import("@/lib/db");
+          const patId = authCtx.patientId as `${string}-${string}-${string}-${string}-${string}`;
+          await db.insert(readings).values({
+            patientId:  patId,
+            type,
+            value:      String(value),
+            unit,
+            source,
+            recordedAt: recDate,
+            notes,
+          });
+
+          if (triggeredAlerts.length > 0) {
+            await db.insert(alertEvents).values(
+              triggeredAlerts.map((a) => ({
+                patientId:   patId,
+                severity:    a.severity,
+                status:      "active" as const,
+                type:        a.type,
+                message:     a.message,
+                value:       a.value !== undefined ? String(a.value) : undefined,
+                threshold:   a.threshold !== undefined ? String(a.threshold) : undefined,
+                triggeredAt: new Date(a.triggeredAt),
+              }))
+            );
+          }
+        } catch (legacyErr) {
+          console.warn("[readings] legacy table insert skipped:", legacyErr);
+        }
       }
 
       // Audit log (fire and forget)
@@ -108,7 +157,7 @@ export async function POST(request: NextRequest) {
       void writeAuditLog({
         actorId:    authCtx.clerkUserId,
         action:     "WRITE",
-        resource:   "readings",
+        resource:   "vitals",
         resourceId: insertedId,
         patientId:  authCtx.patientId,
         ...getRequestMeta(request),
@@ -132,17 +181,16 @@ export async function POST(request: NextRequest) {
   if (criticalAlert) {
     if (isDatabaseConfigured()) {
       try {
-        const { db, patientProfiles } = await import("@/lib/db");
+        const { db, profiles } = await import("@/lib/db");
         const { eq } = await import("drizzle-orm");
-        const patId = authCtx.patientId as `${string}-${string}-${string}-${string}-${string}`;
 
         const [profile] = await db
           .select({
-            name: patientProfiles.name,
-            emergencyContact: patientProfiles.emergencyContact,
+            name: profiles.displayName,
+            emergencyContact: profiles.emergencyContact,
           })
-          .from(patientProfiles)
-          .where(eq(patientProfiles.id, patId))
+          .from(profiles)
+          .where(eq(profiles.id, authCtx.userId))
           .limit(1);
 
         if (profile && profile.emergencyContact) {
@@ -150,7 +198,7 @@ export async function POST(request: NextRequest) {
           if (contact && contact.phone) {
             const { sendCriticalAlertSms } = await import("@/lib/sms");
             void sendCriticalAlertSms(
-              profile.name,
+              profile.name || "Patient",
               contact.name,
               contact.phone,
               criticalAlert.message
@@ -161,17 +209,7 @@ export async function POST(request: NextRequest) {
         console.error("[readings:sms] Error retrieving emergency contact:", smsErr);
       }
     } else {
-      try {
-        const { sendCriticalAlertSms } = await import("@/lib/sms");
-        void sendCriticalAlertSms(
-          "Arjun Mehta",
-          "Sunita Mehta",
-          "+919876543210",
-          criticalAlert.message
-        );
-      } catch (smsErr) {
-        console.error("[readings:sms] Error sending mock relative alert SMS:", smsErr);
-      }
+      // No emergency contact registered yet
     }
   }
 
@@ -220,6 +258,43 @@ export async function GET(request: NextRequest) {
   const rangeEnd   = searchParams.get("rangeEnd");
 
   try {
+    const supabase = (await import("@/lib/supabase")).getSupabaseAdminClient();
+    let vitalsQuery = supabase
+      .from("vitals")
+      .select("id, user_id, type, value, unit, source, recorded_at, notes")
+      .eq("user_id", authCtx.userId);
+
+    if (type) vitalsQuery = vitalsQuery.eq("type", type);
+    if (rangeStart) vitalsQuery = vitalsQuery.gte("recorded_at", new Date(rangeStart).toISOString());
+    if (rangeEnd) vitalsQuery = vitalsQuery.lte("recorded_at", new Date(rangeEnd).toISOString());
+    vitalsQuery = vitalsQuery.order("recorded_at", { ascending: false }).limit(limit);
+
+    const { data: vitalsRows } = await vitalsQuery;
+    if (vitalsRows && vitalsRows.length > 0) {
+      const mapped = vitalsRows.map((v) => ({
+        id: v.id,
+        patientId: v.user_id,
+        type: v.type,
+        value: v.value,
+        unit: v.unit,
+        source: v.source,
+        recordedAt: v.recorded_at,
+        notes: v.notes,
+      }));
+      return NextResponse.json(
+        { data: mapped, meta: { total: mapped.length, limit }, requestId, timestamp: new Date().toISOString() },
+        { status: 200 }
+      );
+    }
+
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(authCtx.patientId);
+    if (!isUuid) {
+      return NextResponse.json(
+        { data: [], meta: { total: 0, limit }, requestId, timestamp: new Date().toISOString() },
+        { status: 200 }
+      );
+    }
+
     const { db, readings } = await import("@/lib/db");
     const { eq, and, desc, gte, lte } = await import("drizzle-orm");
     const patId = authCtx.patientId as `${string}-${string}-${string}-${string}-${string}`;

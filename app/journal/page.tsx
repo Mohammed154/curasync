@@ -29,12 +29,6 @@ const CONDITION_SYMPTOMS: Record<string, string[]> = {
   asthma:       ["Wheezing", "Coughing", "Chest tightness", "Shortness of breath", "Sleep disruption"],
 };
 
-const MOCK_ENTRIES: SymptomEntry[] = [
-  { id: "s1", text: "Mild dizziness in the morning after waking up", severity: 4, conditionId: "hypertension", createdAt: new Date(Date.now() - 1000*60*60*3) },
-  { id: "s2", text: "Increased thirst throughout the day", severity: 6, conditionId: "diabetes_t2", createdAt: new Date(Date.now() - 1000*60*60*26) },
-  { id: "s3", text: "Ankle swelling noticed in the evening", severity: 5, conditionId: "ckd", createdAt: new Date(Date.now() - 1000*60*60*49) },
-];
-
 const BODY_LOCATIONS = ["Head", "Chest", "Abdomen", "Left arm", "Right arm", "Left leg", "Right leg", "Back", "Feet/Ankles", "Hands", "Eyes", "General/Whole body"];
 
 const SEVERITY_LABELS: Record<number, { label: string; color: string }> = {
@@ -51,7 +45,8 @@ const SEVERITY_LABELS: Record<number, { label: string; color: string }> = {
 };
 
 export default function JournalPage() {
-  const [entries, setEntries] = useState<SymptomEntry[]>(MOCK_ENTRIES);
+  const [entries, setEntries] = useState<SymptomEntry[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [text, setText] = useState("");
   const [severity, setSeverity] = useState(5);
@@ -66,7 +61,7 @@ export default function JournalPage() {
     fetch("/api/v1/journal")
       .then((res) => (res.ok ? res.json() : null))
       .then((json) => {
-        if (json?.data?.length) {
+        if (json?.data && Array.isArray(json.data)) {
           const mapped: SymptomEntry[] = json.data.map((e: any) => ({
             id: e.id,
             text: e.text,
@@ -76,9 +71,16 @@ export default function JournalPage() {
             createdAt: new Date(e.recordedAt || e.createdAt),
           }));
           setEntries(mapped);
+        } else {
+          setEntries([]);
         }
       })
-      .catch(() => {});
+      .catch(() => {
+        setEntries([]);
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -187,8 +189,23 @@ export default function JournalPage() {
         {tab === "log" && (
           <div className="space-y-4 animate-fade-in">
             {entries.length === 0 ? (
-              <div className="bg-bg-card rounded-xl p-8 shadow-card text-center text-text-tertiary">
-                No symptoms logged yet. Click &quot;Log Symptom&quot; to add your first entry.
+              <div className="bg-bg-card border border-divider rounded-2xl p-10 shadow-card text-center space-y-4">
+                <div className="w-14 h-14 rounded-2xl bg-bg-lavender text-accent-violet flex items-center justify-center mx-auto shadow-xs">
+                  <BookOpen size={28} />
+                </div>
+                <div className="max-w-md mx-auto">
+                  <h3 className="font-bold text-title-md text-text-primary">No Journal Entries Yet</h3>
+                  <p className="text-body-md text-text-secondary mt-1.5 leading-relaxed">
+                    Track your daily symptoms, energy levels, and medication effects to give your healthcare team a comprehensive view of your well-being.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowForm(true)}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl gradient-violet text-white text-label-sm font-semibold shadow-card hover:opacity-95 transition-opacity"
+                >
+                  <Plus size={16} />
+                  <span>Write an Entry</span>
+                </button>
               </div>
             ) : (
               entries.map((entry) => {
@@ -213,7 +230,7 @@ export default function JournalPage() {
                     </div>
 
                     <p className="text-sm text-text-primary font-medium">{entry.text}</p>
-                    <p className="text-[11px] text-text-tertiary">{format(entry.createdAt, "EEEE, MMM d, yyyy · h:mm a")}</p>
+                    <p suppressHydrationWarning className="text-[11px] text-text-tertiary">{format(entry.createdAt, "EEEE, MMM d, yyyy · h:mm a")}</p>
                   </div>
                 );
               })

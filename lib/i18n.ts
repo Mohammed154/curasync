@@ -18,7 +18,7 @@ export const LOCALE_METADATA: Record<SupportedLocale, { label: string; nativeLab
 export const DEFAULT_LOCALE: SupportedLocale = "en";
 
 // ── Stub t() function — replace with next-intl's useTranslations() in Phase 2 ──
-// Usage: const t = useLocale(); t("dashboard.greeting", { name: "Arjun" })
+// Usage: const t = useLocale(); t("dashboard.greeting", { name: "User" })
 export function createStubTranslator(locale: SupportedLocale = "en") {
   return function t(key: string, _vars?: Record<string, string | number>): string {
     // Phase 1: return key as-is (English strings are hardcoded in components)

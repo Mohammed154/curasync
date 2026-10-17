@@ -8,6 +8,12 @@
   "env": {
     "NEXT_PUBLIC_APP_ENV": "production"
   },
+  "crons": [
+    {
+      "path": "/api/cron/monthly-report",
+      "schedule": "0 0 * * *"
+    }
+  ],
   "headers": [
     {
       "source": "/api/(.*)",

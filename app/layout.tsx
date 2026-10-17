@@ -15,11 +15,15 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
+import { AuthProvider } from "@/context/AuthContext";
+
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning className={cn("font-sans", inter.variable)}>
       <body className="bg-bg-light font-sans text-text-primary antialiased">
-        {children}
+        <AuthProvider>
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );

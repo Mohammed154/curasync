@@ -51,6 +51,12 @@ export interface PatientProfile {
   dateOfBirth: string; // ISO date
   conditions: ConditionId[];
   emergencyContact: EmergencyContact;
+  latitude?: number;
+  longitude?: number;
+  city?: string;
+  region?: string;
+  country?: string;
+  locationUpdatedAt?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -69,7 +75,7 @@ export interface BiometricReading {
   type: BiometricType;
   value: number;
   unit: string;
-  source: "manual" | "apple_health" | "fitbit" | "garmin" | "ble";
+  source: "manual";
   recordedAt: string; // ISO datetime
   notes?: string;
 }
@@ -80,7 +86,7 @@ export interface BloodPressureReading {
   systolic: number;
   diastolic: number;
   pulse: number;
-  source: "manual" | "apple_health" | "fitbit" | "garmin" | "ble";
+  source: "manual";
   recordedAt: string;
 }
 
@@ -116,7 +122,7 @@ export interface Alert {
   patientId: string;
   severity: AlertSeverity;
   status: AlertStatus;
-  type: BiometricType | "medication_missed" | "wearable_sync_failed";
+  type: BiometricType | "medication_missed";
   message: string;
   value?: number;
   threshold?: number;

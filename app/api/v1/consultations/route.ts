@@ -83,6 +83,26 @@ export async function POST(request: NextRequest) {
   }
 
   const patId = authCtx.patientId as `${string}-${string}-${string}-${string}-${string}`;
+  const providerId = parsed.data.providerId;
+
+  // Enforce verified active doctor-patient connection before booking consultation
+  const { verifyDoctorPatientConnection } = await import("@/lib/telehealth-auth");
+  const connection = await verifyDoctorPatientConnection(patId, providerId);
+
+  if (!connection.connected || connection.status !== "active") {
+    return NextResponse.json(
+      {
+        error: "Forbidden: You cannot schedule or start a video consultation without an active, verified doctor connection.",
+        code: "DOCTOR_CONNECTION_REQUIRED",
+        connected: false,
+        status: connection.status,
+        provider: connection.provider,
+        requestId,
+      },
+      { status: 403 }
+    );
+  }
+
   const scheduledDate = new Date(parsed.data.scheduledAt);
   const expSec = Math.floor(scheduledDate.getTime() / 1000) + (parsed.data.durationMin + 60) * 60;
   const roomName = `curasync-${nanoid(8).toLowerCase()}`;
@@ -92,7 +112,7 @@ export async function POST(request: NextRequest) {
   try {
     const [inserted] = await db.insert(consultations).values({
       patientId:   patId,
-      providerId:  parsed.data.providerId,
+      providerId:  providerId,
       scheduledAt: scheduledDate,
       durationMin: parsed.data.durationMin,
       status:      "scheduled",
@@ -112,7 +132,7 @@ export async function POST(request: NextRequest) {
           patientId:             patId,
           createdBy:             authCtx.clerkUserId,
           title:                 "Upcoming Video Consultation (Tomorrow)",
-          description:           `Consultation with ${parsed.data.providerId === "dev_provider_001" ? "Dr. Priya Sharma" : "Provider"} scheduled for tomorrow at ${scheduledDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}.`,
+          description:           `Consultation with ${providerId === "dev_provider_001" ? "Dr. Priya Sharma" : "Provider"} scheduled for tomorrow at ${scheduledDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}.`,
           dueDate:               rem24h,
           reminderType:          "consultation",
           relatedConsultationId: inserted?.id,
@@ -147,21 +167,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ data: inserted, requestId, timestamp: new Date().toISOString() }, { status: 201 });
   } catch (err) {
     console.error("[consultations] POST error:", err);
-    // Mock return for local resilience if DB not configured
-    const mockConsultation = {
-      id: crypto.randomUUID(),
-      patientId: patId,
-      providerId: parsed.data.providerId,
-      scheduledAt: scheduledDate,
-      durationMin: parsed.data.durationMin,
-      status: "scheduled",
-      roomUrl: room.url,
-      roomName: room.name,
-      notes: parsed.data.notes ?? null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-    return NextResponse.json({ data: mockConsultation, requestId, timestamp: new Date().toISOString() }, { status: 201 });
+    return NextResponse.json(
+      { error: "Failed to create consultation record", code: "DATABASE_ERROR", requestId },
+      { status: 500 }
+    );
   }
 }
 

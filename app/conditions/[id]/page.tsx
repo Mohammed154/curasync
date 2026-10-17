@@ -4,115 +4,119 @@ import React, { useState } from "react";
 import AppShell from "@/components/layout/AppShell";
 import GlucoseChart from "@/components/charts/GlucoseChart";
 import GlucoseLogChart from "@/components/charts/GlucoseLogChart";
-import { getMockDashboardData, generateSparklinePublic, getMockGlucoseLog } from "@/lib/mock-data";
 import { conditionColors } from "@/lib/design-tokens";
-import type { ConditionId } from "@/types";
-import { ArrowLeft, TrendingDown, TrendingUp, Minus, Clock, CheckCircle2 } from "lucide-react";
+import type { ConditionId, SparklinePoint } from "@/types";
+import { ArrowLeft, TrendingDown, TrendingUp, Minus, Clock, CheckCircle2, Activity, Pill, Plus } from "lucide-react";
 import Link from "next/link";
 import { clsx } from "clsx";
+import { useReadings, useMedications } from "@/hooks/useApi";
+import type { GlucoseLogEntry, GlucoseReadingType } from "@/lib/glucose-utils";
+import { getGlucoseStatus } from "@/lib/glucose-utils";
 
-const CONDITION_METRICS: Record<string, {
-  primary: { label: string; value: string; unit: string; status: "green" | "amber" | "red" };
-  secondary: { label: string; value: string; unit: string }[];
+interface ConditionMetricTemplate {
+  primary: { label: string; unit: string; vitalType: string };
+  secondary: { label: string; unit: string; key?: string }[];
   chartLabel: string;
-}> = {
+}
+
+const CONDITION_METRICS: Record<string, ConditionMetricTemplate> = {
   diabetes_t2: {
-    primary: { label: "Blood Glucose", value: "142", unit: "mg/dL", status: "amber" },
+    primary: { label: "Blood Glucose", unit: "mg/dL", vitalType: "blood_glucose" },
     secondary: [
-      { label: "HbA1c", value: "7.4", unit: "%" },
-      { label: "Fasting (avg)", value: "128", unit: "mg/dL" },
-      { label: "Post-meal (avg)", value: "168", unit: "mg/dL" },
-      { label: "Time in Range", value: "64", unit: "%" },
+      { label: "HbA1c", unit: "%", key: "hba1c" },
+      { label: "Fasting (avg)", unit: "mg/dL", key: "fasting_avg" },
+      { label: "Post-meal (avg)", unit: "mg/dL", key: "post_meal_avg" },
+      { label: "Time in Range", unit: "%", key: "tir" },
     ],
     chartLabel: "24-hour glucose trend",
   },
   diabetes_t1: {
-    primary: { label: "Blood Glucose", value: "142", unit: "mg/dL", status: "amber" },
+    primary: { label: "Blood Glucose", unit: "mg/dL", vitalType: "blood_glucose" },
     secondary: [
-      { label: "HbA1c", value: "7.2", unit: "%" },
-      { label: "Fasting (avg)", value: "125", unit: "mg/dL" },
-      { label: "Post-meal (avg)", value: "160", unit: "mg/dL" },
-      { label: "Time in Range", value: "68", unit: "%" },
+      { label: "HbA1c", unit: "%", key: "hba1c" },
+      { label: "Fasting (avg)", unit: "mg/dL", key: "fasting_avg" },
+      { label: "Post-meal (avg)", unit: "mg/dL", key: "post_meal_avg" },
+      { label: "Time in Range", unit: "%", key: "tir" },
     ],
     chartLabel: "24-hour glucose trend",
   },
   hypertension: {
-    primary: { label: "Blood Pressure", value: "138/88", unit: "mmHg", status: "amber" },
+    primary: { label: "Blood Pressure", unit: "mmHg", vitalType: "blood_pressure" },
     secondary: [
-      { label: "Systolic avg", value: "136", unit: "mmHg" },
-      { label: "Diastolic avg", value: "87", unit: "mmHg" },
-      { label: "Pulse pressure", value: "50", unit: "mmHg" },
-      { label: "Readings this week", value: "14", unit: "" },
+      { label: "Systolic avg", unit: "mmHg", key: "systolic_avg" },
+      { label: "Diastolic avg", unit: "mmHg", key: "diastolic_avg" },
+      { label: "Pulse pressure", unit: "mmHg", key: "pulse_pressure" },
+      { label: "Readings this week", unit: "", key: "week_count" },
     ],
     chartLabel: "7-day BP trend",
   },
   ckd: {
-    primary: { label: "eGFR", value: "48", unit: "mL/min/1.73m²", status: "amber" },
+    primary: { label: "eGFR", unit: "mL/min/1.73m²", vitalType: "egfr" },
     secondary: [
-      { label: "Creatinine", value: "1.6", unit: "mg/dL" },
-      { label: "BUN", value: "22", unit: "mg/dL" },
-      { label: "Stage", value: "3A", unit: "" },
-      { label: "Last lab", value: "Apr 10", unit: "" },
+      { label: "Creatinine", unit: "mg/dL", key: "creatinine" },
+      { label: "BUN", unit: "mg/dL", key: "bun" },
+      { label: "Stage", unit: "", key: "stage" },
+      { label: "Last lab", unit: "", key: "last_lab" },
     ],
     chartLabel: "eGFR trend (6 months)",
   },
   copd: {
-    primary: { label: "FEV1", value: "68", unit: "%", status: "green" },
+    primary: { label: "FEV1", unit: "%", vitalType: "fev1" },
     secondary: [
-      { label: "FEV1/FVC", value: "68", unit: "%" },
-      { label: "Activity tolerance", value: "Normal", unit: "" },
-      { label: "Inhaler use", value: "1.2", unit: "/day" },
-      { label: "Last spirometry", value: "May 12", unit: "" },
+      { label: "FEV1/FVC", unit: "%", key: "fev1_fvc" },
+      { label: "Activity tolerance", unit: "", key: "activity_tol" },
+      { label: "Inhaler use", unit: "/day", key: "inhaler_use" },
+      { label: "Last spirometry", unit: "", key: "last_spiro" },
     ],
     chartLabel: "6-month FEV1 trend",
   },
   chf: {
-    primary: { label: "Heart Rate", value: "74", unit: "bpm", status: "green" },
+    primary: { label: "Heart Rate", unit: "bpm", vitalType: "heart_rate" },
     secondary: [
-      { label: "Ejection Fraction", value: "45", unit: "%" },
-      { label: "Blood Pressure", value: "122/78", unit: "mmHg" },
-      { label: "Fluid retention", value: "0.2", unit: "kg" },
-      { label: "Last BNP lab", value: "Mar 15", unit: "" },
+      { label: "Ejection Fraction", unit: "%", key: "ef" },
+      { label: "Blood Pressure", unit: "mmHg", key: "bp" },
+      { label: "Fluid retention", unit: "kg", key: "fluid" },
+      { label: "Last BNP lab", unit: "", key: "last_bnp" },
     ],
     chartLabel: "7-day heart rate trend",
   },
   cad: {
-    primary: { label: "Heart Rate", value: "74", unit: "bpm", status: "green" },
+    primary: { label: "Heart Rate", unit: "bpm", vitalType: "heart_rate" },
     secondary: [
-      { label: "LDL Cholesterol", value: "78", unit: "mg/dL" },
-      { label: "Blood Pressure", value: "118/74", unit: "mmHg" },
-      { label: "Readings this week", value: "10", unit: "" },
-      { label: "Last EKG", value: "Jan 20", unit: "" },
+      { label: "LDL Cholesterol", unit: "mg/dL", key: "ldl" },
+      { label: "Blood Pressure", unit: "mmHg", key: "bp" },
+      { label: "Readings this week", unit: "", key: "week_count" },
+      { label: "Last EKG", unit: "", key: "last_ekg" },
     ],
     chartLabel: "7-day heart rate trend",
   },
   hypothyroidism: {
-    primary: { label: "TSH", value: "4.2", unit: "mIU/L", status: "green" },
+    primary: { label: "TSH", unit: "mIU/L", vitalType: "tsh" },
     secondary: [
-      { label: "Free T4", value: "1.2", unit: "ng/dL" },
-      { label: "Free T3", value: "3.1", unit: "pg/mL" },
-      { label: "Levothyroxine dose", value: "75", unit: "mcg" },
-      { label: "Last lab", value: "Mar 28", unit: "" },
+      { label: "Free T4", unit: "ng/dL", key: "free_t4" },
+      { label: "Free T3", unit: "pg/mL", key: "free_t3" },
+      { label: "Levothyroxine dose", unit: "mcg", key: "levo_dose" },
+      { label: "Last lab", unit: "", key: "last_lab" },
     ],
     chartLabel: "TSH trend (6 months)",
   },
   ra: {
-    primary: { label: "DAS28 Score", value: "3.4", unit: "", status: "green" },
+    primary: { label: "DAS28 Score", unit: "", vitalType: "das28" },
     secondary: [
-      { label: "CRP", value: "4.8", unit: "mg/L" },
-      { label: "ESR", value: "18", unit: "mm/hr" },
-      { label: "Pain scale (avg)", value: "2.4", unit: "/10" },
-      { label: "Morning stiffness", value: "20", unit: "min" },
+      { label: "CRP", unit: "mg/L", key: "crp" },
+      { label: "ESR", unit: "mm/hr", key: "esr" },
+      { label: "Pain scale (avg)", unit: "/10", key: "pain_avg" },
+      { label: "Morning stiffness", unit: "min", key: "morning_stiff" },
     ],
     chartLabel: "DAS28 score trend (6 months)",
   },
   asthma: {
-    primary: { label: "Control Test Score", value: "22", unit: "/25", status: "green" },
+    primary: { label: "Control Test Score", unit: "/25", vitalType: "asthma_control" },
     secondary: [
-      { label: "Rescue inhaler use", value: "1", unit: "/week" },
-      { label: "Control test score", value: "22", unit: "/25" },
-      { label: "Trigger events", value: "0", unit: "this week" },
-      { label: "Last checkup", value: "May 05", unit: "" },
+      { label: "Rescue inhaler use", unit: "/week", key: "rescue_use" },
+      { label: "Control test score", unit: "/25", key: "test_score" },
+      { label: "Trigger events", unit: "this week", key: "trigger_events" },
+      { label: "Last checkup", unit: "", key: "last_checkup" },
     ],
     chartLabel: "Asthma control score trend (6 months)",
   },
@@ -131,13 +135,149 @@ interface Props {
 export default function ConditionDetailPage({ params }: Props) {
   const { id } = React.use(params);
   const conditionId = id as ConditionId;
-  const { todayMedications, recentReadings } = getMockDashboardData();
   const colors = conditionColors[conditionId];
-  const metrics = CONDITION_METRICS[conditionId];
-  const condMeds = todayMedications.filter((m) => m.conditionId === conditionId);
+  const metricTemplate = CONDITION_METRICS[conditionId];
   const [timeRange, setTimeRange] = useState<"7d" | "30d" | "90d">("7d");
 
-  if (!colors || !metrics) {
+  const { data: readingsData } = useReadings(undefined, 100);
+  const { data: medicationsData } = useMedications();
+
+  const recentReadings: SparklinePoint[] = React.useMemo(() => {
+    if (!readingsData || readingsData.length === 0) return [];
+    return readingsData
+      .filter((r) => r.type === "blood_glucose")
+      .slice(0, 15)
+      .reverse()
+      .map((r: any) => ({
+        time: r.recordedAt || r.recorded_at || new Date().toISOString(),
+        value: Math.round(parseFloat(r.value)),
+      }));
+  }, [readingsData]);
+
+  const glucoseLogs: GlucoseLogEntry[] = React.useMemo(() => {
+    if (!readingsData || readingsData.length === 0) return [];
+    return readingsData
+      .filter((r) => r.type === "blood_glucose")
+      .map((r: any, idx) => {
+        const val = Math.round(parseFloat(r.value));
+        const statusMeta = getGlucoseStatus(val, "Fasting");
+        return {
+          id: r.id || `glog_${idx}`,
+          datetime: r.recordedAt || r.recorded_at || new Date().toISOString(),
+          glucose: val,
+          readingType: "Fasting" as GlucoseReadingType,
+          status: statusMeta.status,
+          color: statusMeta.color,
+          notes: r.notes || undefined,
+        };
+      });
+  }, [readingsData]);
+
+  const condMeds = React.useMemo(() => {
+    if (!medicationsData || medicationsData.length === 0) return [];
+    return medicationsData
+      .filter((m: any) => m.conditionId === conditionId)
+      .map((m: any) => ({
+        id: m.id,
+        name: m.name,
+        dosage: m.dosage,
+        scheduledAt: m.scheduledTimes?.[0] || "08:00",
+        status: m.status || "pending",
+        conditionId: m.conditionId,
+      }));
+  }, [medicationsData, conditionId]);
+
+  // Derive dynamic primary value, status, and trend
+  const { primaryValue, primaryStatus, trendText, trendIcon } = React.useMemo(() => {
+    if (!metricTemplate) {
+      return { primaryValue: "--", primaryStatus: "green" as const, trendText: "No readings logged", trendIcon: "neutral" as const };
+    }
+
+    const relevant = (readingsData || []).filter((r) => r.type === metricTemplate.primary.vitalType);
+    const latest = relevant[0];
+    if (!latest) {
+      return { primaryValue: "--", primaryStatus: "green" as const, trendText: "No readings logged yet", trendIcon: "neutral" as const };
+    }
+
+    const valNum = parseFloat(latest.value);
+    const displayVal = isNaN(valNum) ? String(latest.value) : String(Math.round(valNum));
+
+    let status: "green" | "amber" | "red" = "green";
+    if (metricTemplate.primary.vitalType === "blood_glucose" && !isNaN(valNum)) {
+      const gStat = getGlucoseStatus(valNum, "Fasting").status;
+      if (gStat === "Normal") status = "green";
+      else if (gStat === "Elevated") status = "amber";
+      else status = "red";
+    }
+
+    let trend = "Latest recorded reading";
+    let icon: "up" | "down" | "neutral" = "neutral";
+    const prev = relevant[1];
+    if (prev) {
+      const prevNum = parseFloat(prev.value);
+      if (!isNaN(valNum) && !isNaN(prevNum)) {
+        const diff = valNum - prevNum;
+        if (diff < 0) {
+          trend = `Trending down (${Math.abs(Math.round(diff))} ${metricTemplate.primary.unit})`;
+          icon = "down";
+        } else if (diff > 0) {
+          trend = `Trending up (+${Math.round(diff)} ${metricTemplate.primary.unit})`;
+          icon = "up";
+        } else {
+          trend = "Stable compared to previous";
+          icon = "neutral";
+        }
+      }
+    }
+
+    return { primaryValue: displayVal, primaryStatus: status, trendText: trend, trendIcon: icon };
+  }, [metricTemplate, readingsData]);
+
+  // Derive dynamic secondary metrics
+  const secondaryMetrics = React.useMemo(() => {
+    if (!metricTemplate) return [];
+
+    return metricTemplate.secondary.map((s) => {
+      let value = "--";
+
+      if (s.key === "tir" && glucoseLogs.length > 0) {
+        const inRange = glucoseLogs.filter((g) => g.glucose >= 70 && g.glucose <= 180).length;
+        value = `${Math.round((inRange / glucoseLogs.length) * 100)}`;
+      } else if (s.key === "fasting_avg" && glucoseLogs.length > 0) {
+        const fasting = glucoseLogs.filter((g) => g.readingType === "Fasting");
+        if (fasting.length > 0) {
+          const avg = Math.round(fasting.reduce((sum, g) => sum + g.glucose, 0) / fasting.length);
+          value = `${avg}`;
+        }
+      } else if (s.key === "post_meal_avg" && glucoseLogs.length > 0) {
+        const postMeal = glucoseLogs.filter((g) => g.readingType === "After Meal" || g.readingType === "Bedtime");
+        if (postMeal.length > 0) {
+          const avg = Math.round(postMeal.reduce((sum, g) => sum + g.glucose, 0) / postMeal.length);
+          value = `${avg}`;
+        }
+      } else if (s.key === "week_count" && readingsData) {
+        const oneWeekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+        const count = readingsData.filter(
+          (r) => (r.type === metricTemplate.primary.vitalType || r.type === "blood_pressure") &&
+                 new Date(r.recordedAt || (r as any).recorded_at || Date.now()).getTime() >= oneWeekAgo
+        ).length;
+        value = `${count}`;
+      } else if (s.key && readingsData) {
+        const matching = readingsData.find((r) => r.type === s.key);
+        if (matching?.value != null) {
+          value = String(matching.value);
+        }
+      }
+
+      return {
+        label: s.label,
+        value,
+        unit: s.unit,
+      };
+    });
+  }, [metricTemplate, glucoseLogs, readingsData]);
+
+  if (!colors || !metricTemplate) {
     return (
       <AppShell>
         <div className="flex items-center justify-center h-64">
@@ -150,7 +290,7 @@ export default function ConditionDetailPage({ params }: Props) {
     );
   }
 
-  const statusCfg = STATUS_CONFIG[metrics.primary.status];
+  const statusCfg = STATUS_CONFIG[primaryStatus];
 
   return (
     <AppShell>
@@ -181,22 +321,28 @@ export default function ConditionDetailPage({ params }: Props) {
           className="rounded-xl p-5 animate-fade-in"
           style={{ background: colors.bg }}
         >
-          <p className="text-xs font-semibold text-text-tertiary uppercase tracking-widest mb-2">{metrics.primary.label}</p>
+          <p className="text-xs font-semibold text-text-tertiary uppercase tracking-widest mb-2">{metricTemplate.primary.label}</p>
           <div className="flex items-end gap-2 mb-1">
             <span className="font-bold metric-value text-text-primary" style={{ fontSize: "clamp(32px, 6vw, 44px)", lineHeight: 1 }}>
-              {metrics.primary.value}
+              {primaryValue}
             </span>
-            <span className="text-text-tertiary text-sm mb-1.5">{metrics.primary.unit}</span>
+            <span className="text-text-tertiary text-sm mb-1.5">{metricTemplate.primary.unit}</span>
           </div>
           <div className="flex items-center gap-1.5 text-sm" style={{ color: colors.accent }}>
-            <TrendingDown size={14} aria-hidden="true" />
-            <span className="font-medium">Trending down — improving</span>
+            {trendIcon === "down" ? (
+              <TrendingDown size={14} aria-hidden="true" />
+            ) : trendIcon === "up" ? (
+              <TrendingUp size={14} aria-hidden="true" />
+            ) : (
+              <Minus size={14} aria-hidden="true" />
+            )}
+            <span className="font-medium">{trendText}</span>
           </div>
         </div>
 
         {/* Secondary metrics grid */}
         <div className="grid grid-cols-2 gap-3">
-          {metrics.secondary.map((m) => (
+          {secondaryMetrics.map((m) => (
             <div key={m.label} className="bg-bg-card rounded-xl p-4 shadow-card card-enter">
               <p className="text-xs text-text-tertiary mb-1">{m.label}</p>
               <div className="flex items-baseline gap-1">
@@ -210,7 +356,7 @@ export default function ConditionDetailPage({ params }: Props) {
         {/* Chart with time range selector */}
         <div className="bg-bg-card rounded-xl shadow-card overflow-hidden">
           <div className="flex items-center justify-between px-4 pt-4 pb-2">
-            <h3 className="font-semibold text-title-md text-text-primary">{metrics.chartLabel}</h3>
+            <h3 className="font-semibold text-title-md text-text-primary">{metricTemplate.chartLabel}</h3>
             <div className="flex gap-1 p-0.5 bg-bg-light rounded-lg">
               {(["7d", "30d", "90d"] as const).map((r) => (
                 <button
@@ -228,7 +374,24 @@ export default function ConditionDetailPage({ params }: Props) {
             </div>
           </div>
           <div className="px-4 pb-4">
-            <GlucoseChart data={recentReadings} />
+            {recentReadings.length > 0 ? (
+              <GlucoseChart data={recentReadings} />
+            ) : (
+              <div className="text-center py-10 px-4 border border-dashed border-divider rounded-xl">
+                <Activity size={28} className="mx-auto text-text-tertiary mb-2" />
+                <p className="font-semibold text-sm text-text-primary">No readings recorded yet</p>
+                <p className="text-xs text-text-secondary mt-1 max-w-sm mx-auto">
+                  Log your first biometric reading to populate interactive trend graphs and clinical analysis.
+                </p>
+                <Link
+                  href="/glucose"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 mt-3 rounded-lg gradient-violet text-white text-xs font-semibold shadow-sm hover:opacity-95"
+                >
+                  <Plus size={13} />
+                  <span>Log Reading</span>
+                </Link>
+              </div>
+            )}
           </div>
         </div>
 
@@ -238,21 +401,42 @@ export default function ConditionDetailPage({ params }: Props) {
             <h3 id="glucose-log-detail-heading" className="font-semibold text-title-md text-text-primary mb-3">
               Glucose Daily Log
             </h3>
-            <GlucoseLogChart
-              entries={getMockGlucoseLog()}
-              showLogTable={true}
-              showSecondaryChart={true}
-            />
+            {glucoseLogs.length > 0 ? (
+              <GlucoseLogChart
+                entries={glucoseLogs}
+                showLogTable={true}
+                showSecondaryChart={true}
+              />
+            ) : (
+              <div className="bg-bg-card border border-divider rounded-xl p-8 text-center shadow-card space-y-2">
+                <Activity size={26} className="mx-auto text-accent-violet" />
+                <p className="font-semibold text-sm text-text-primary">No Glucose Entries Logged</p>
+                <p className="text-xs text-text-secondary max-w-sm mx-auto">
+                  Record your blood sugar readings across fasting, pre-meal, and bedtime checkpoints to generate automated daily averages.
+                </p>
+                <Link
+                  href="/glucose"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 mt-2 rounded-lg gradient-violet text-white text-xs font-semibold shadow-sm"
+                >
+                  <Plus size={13} />
+                  <span>Log Blood Sugar</span>
+                </Link>
+              </div>
+            )}
           </section>
         )}
 
         {/* Medications for this condition */}
-        {condMeds.length > 0 && (
-          <div className="bg-bg-card rounded-xl shadow-card overflow-hidden">
-            <div className="px-4 py-3 border-b border-divider">
-              <h3 className="font-semibold text-title-md text-text-primary">Medications for {colors.label}</h3>
-            </div>
-            {condMeds.map((med, i) => (
+        <div className="bg-bg-card rounded-xl shadow-card overflow-hidden">
+          <div className="px-4 py-3 border-b border-divider flex items-center justify-between">
+            <h3 className="font-semibold text-title-md text-text-primary">Medications for {colors.label}</h3>
+            <Link href="/medications" className="text-xs font-semibold text-accent-violet hover:underline flex items-center gap-1">
+              <Plus size={13} />
+              <span>Add</span>
+            </Link>
+          </div>
+          {condMeds.length > 0 ? (
+            condMeds.map((med, i) => (
               <div key={med.id} className={clsx("flex items-center gap-3 px-4 py-3", i < condMeds.length - 1 && "border-b border-divider")}>
                 <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: colors.bg }}>
                   <span style={{ color: colors.accent }} className="font-bold text-xs">{med.name[0]}</span>
@@ -273,9 +457,17 @@ export default function ConditionDetailPage({ params }: Props) {
                   </span>
                 </div>
               </div>
-            ))}
-          </div>
-        )}
+            ))
+          ) : (
+            <div className="p-6 text-center text-text-secondary space-y-1.5">
+              <Pill size={22} className="mx-auto text-text-tertiary mb-1" />
+              <p className="text-xs font-medium">No medications linked to {colors.label} yet.</p>
+              <Link href="/medications" className="inline-block text-xs font-bold text-accent-violet hover:underline">
+                Manage Prescriptions →
+              </Link>
+            </div>
+          )}
+        </div>
 
         {/* Reference ranges */}
         <div className="bg-bg-card rounded-xl shadow-card p-4">

@@ -21,22 +21,22 @@ async function seed() {
     const demoPatientId = "00000000-0000-0000-0000-000000000001";
 
     // 1. Upsert demo patient profile
-    console.log("1. Ensuring demo patient profile (Arjun Mehta)...");
+    console.log("1. Ensuring demo patient profile...");
     await sql`
       INSERT INTO patient_profiles (
         id, user_id, name, date_of_birth, conditions, emergency_contact, language, onboarding_complete
       ) VALUES (
         ${demoPatientId},
         'dev_user_001',
-        'Arjun Mehta',
+        'Demo Patient',
         '1965-04-12',
         ARRAY['diabetes_t2', 'hypertension', 'ckd']::condition_id[],
-        ${JSON.stringify({ name: "Ananya Mehta", phone: "+1 555-0192", relationship: "Spouse" })},
+        ${JSON.stringify({ name: "Emergency Contact", phone: "+1 555-0192", relationship: "Spouse" })},
         'en',
         true
       )
       ON CONFLICT (id) DO UPDATE SET
-        name = 'Arjun Mehta',
+        name = 'Demo Patient',
         user_id = 'dev_user_001',
         date_of_birth = '1965-04-12',
         conditions = ARRAY['diabetes_t2', 'hypertension', 'ckd']::condition_id[],
@@ -162,8 +162,8 @@ async function seed() {
         ${consultDate.toISOString()},
         25,
         'scheduled',
-        'https://curasync.daily.co/telehealth-arjun-mehta',
-        'telehealth-arjun-mehta',
+        'https://curasync.daily.co/telehealth-demo',
+        'telehealth-demo',
         'Quarterly chronic condition review & medication titration follow-up.'
       ) RETURNING id;
     `;
@@ -209,14 +209,14 @@ async function seed() {
       INSERT INTO messages (
         thread_id, sender_id, recipient_id, sender_role, content, sent_at
       ) VALUES (
-        ${threadId}, 'provider_dr_sarah_jenkins', 'dev_user_001', 'provider', 'Hello Arjun, your recent blood glucose trends look stable. Please remember to log your BP before our video call tomorrow.', NOW() - INTERVAL '4 hours'
+        ${threadId}, 'provider_dr_sarah_jenkins', 'dev_user_001', 'provider', 'Hello, your recent blood glucose trends look stable. Please remember to log your BP before our video call tomorrow.', NOW() - INTERVAL '4 hours'
       ), (
         ${threadId}, 'dev_user_001', 'provider_dr_sarah_jenkins', 'patient', 'Thank you Dr. Jenkins! I logged this morning BP (126/82). Looking forward to the appointment.', NOW() - INTERVAL '2 hours'
       );
     `;
 
     console.log("\n✅ Demo seed completed successfully!");
-    console.log(`Demo Patient ID: ${demoPatientId} (Arjun Mehta)`);
+    console.log(`Demo Patient ID: ${demoPatientId}`);
   } catch (error) {
     console.error("❌ Seeding failed:", error);
   } finally {

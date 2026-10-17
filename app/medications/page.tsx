@@ -3,31 +3,16 @@
 import React, { useState, useEffect } from "react";
 import AppShell from "@/components/layout/AppShell";
 import MedicationCard from "@/components/patient/MedicationCard";
-import { getMockDashboardData } from "@/lib/mock-data";
-import { Plus, Clock, CheckCircle2, XCircle, AlertCircle, Pill, X, ChevronDown, Check } from "lucide-react";
+import { Plus, Clock, CheckCircle2, XCircle, AlertCircle, Pill, X, ChevronDown, Check, Calendar } from "lucide-react";
 import { clsx } from "clsx";
-import { format, subDays } from "date-fns";
 import { conditionColors } from "@/lib/design-tokens";
 import type { TodayMedication, ConditionId } from "@/types";
 
 const CONDITION_IDS: ConditionId[] = ["diabetes_t2", "hypertension", "ckd", "hypothyroidism", "ra", "asthma"];
 
-interface MedHistory {
-  date: string;
-  taken: number;
-  total: number;
-}
-
-// Generate 30 days of adherence history
-const MOCK_HISTORY: MedHistory[] = Array.from({ length: 30 }, (_, i) => {
-  const total = 4;
-  const taken = Math.floor(Math.random() * (total + 1));
-  return { date: format(subDays(new Date(), 29 - i), "MMM d"), taken, total };
-});
-
 export default function MedicationsPage() {
-  const { todayMedications, weeklyAdherence } = getMockDashboardData();
-  const [meds, setMeds] = useState<TodayMedication[]>(todayMedications);
+  const [meds, setMeds] = useState<TodayMedication[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [tab, setTab] = useState<"today" | "history" | "all">("today");
   const [isSaving, setIsSaving] = useState(false);
@@ -38,7 +23,7 @@ export default function MedicationsPage() {
     fetch("/api/v1/medications")
       .then((res) => (res.ok ? res.json() : null))
       .then((json) => {
-        if (json?.data?.length) {
+        if (json?.data && Array.isArray(json.data)) {
           const mapped: TodayMedication[] = json.data.map((m: any) => ({
             id: m.id,
             name: m.name,
@@ -48,9 +33,16 @@ export default function MedicationsPage() {
             conditionId: (m.conditionId as ConditionId) || "diabetes_t2",
           }));
           setMeds(mapped);
+        } else {
+          setMeds([]);
         }
       })
-      .catch(() => {});
+      .catch(() => {
+        setMeds([]);
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
   }, []);
 
   // Add medication form state
@@ -137,6 +129,7 @@ export default function MedicationsPage() {
   const taken = meds.filter((m) => m.status === "taken").length;
   const missed = meds.filter((m) => m.status === "missed").length;
   const pending = meds.filter((m) => m.status === "pending").length;
+  const adherencePct = meds.length > 0 ? Math.round((taken / meds.length) * 100) : 100;
 
   return (
     <AppShell>
@@ -147,7 +140,9 @@ export default function MedicationsPage() {
           <div>
             <h1 className="font-bold text-display text-text-primary">Medications</h1>
             <p className="text-body-md text-text-secondary mt-1">
-              {meds.length} active prescriptions · {weeklyAdherence}% weekly adherence
+              {meds.length === 0
+                ? "No active prescriptions · Add a medication to track adherence"
+                : `${meds.length} active prescription${meds.length === 1 ? "" : "s"} · ${adherencePct}% today's adherence`}
             </p>
           </div>
           <button
@@ -201,63 +196,102 @@ export default function MedicationsPage() {
 
         {/* TAB 1: Today's medications */}
         {tab === "today" && (
-          <MedicationCard
-            medications={meds}
-            onLogDose={handleLogDose}
-          />
+          meds.length === 0 ? (
+            <div className="bg-bg-card rounded-2xl p-8 shadow-card text-center space-y-4">
+              <div className="w-16 h-16 rounded-2xl bg-accent-violet/10 text-accent-violet flex items-center justify-center mx-auto">
+                <Pill size={32} />
+              </div>
+              <div className="space-y-1">
+                <h3 className="font-bold text-title-md text-text-primary">No Active Medications</h3>
+                <p className="text-body-sm text-text-secondary max-w-sm mx-auto">
+                  You have not added any medications to your schedule yet. Add your daily prescriptions to track doses and stay on schedule.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowAdd(true)}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl gradient-violet text-white font-semibold text-label-sm shadow-card hover:opacity-90 transition-opacity"
+              >
+                <Plus size={16} />
+                Add Medication
+              </button>
+            </div>
+          ) : (
+            <MedicationCard
+              medications={meds}
+              onLogDose={handleLogDose}
+            />
+          )
         )}
 
         {/* TAB 2: History heatmap */}
         {tab === "history" && (
-          <div className="bg-bg-card rounded-xl shadow-card p-5 space-y-4 animate-fade-in">
-            <h2 className="font-semibold text-title-md text-text-primary">30-Day Medication Adherence</h2>
-            <div className="grid grid-cols-6 sm:grid-cols-10 gap-1.5">
-              {MOCK_HISTORY.map((h) => {
-                const pct = h.total > 0 ? (h.taken / h.total) * 100 : 0;
-                const bg =
-                  pct === 100 ? "#00B894" :
-                  pct >= 75   ? "#55EFC4" :
-                  pct >= 50   ? "#FDCB6E" :
-                  pct > 0     ? "#E17055" : "#D63031";
-                return (
-                  <div
-                    key={h.date}
-                    className="aspect-square rounded-lg flex flex-col items-center justify-center text-[10px] text-white font-bold transition-transform hover:scale-110 cursor-default"
-                    style={{ background: bg }}
-                    title={`${h.date}: ${h.taken}/${h.total} taken (${Math.round(pct)}%)`}
-                  >
-                    <span>{h.date.split(" ")[1]}</span>
-                  </div>
-                );
-              })}
+          <div className="bg-bg-card rounded-2xl p-8 shadow-card text-center space-y-4">
+            <div className="w-16 h-16 rounded-2xl bg-text-tertiary/10 text-text-tertiary flex items-center justify-center mx-auto">
+              <Calendar size={32} />
             </div>
+            <div className="space-y-1">
+              <h3 className="font-bold text-title-md text-text-primary">No Adherence History Yet</h3>
+              <p className="text-body-sm text-text-secondary max-w-sm mx-auto">
+                Your 30-day medication adherence record will automatically build up here as you log your daily doses.
+              </p>
+            </div>
+            {meds.length === 0 && (
+              <button
+                onClick={() => setShowAdd(true)}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl gradient-violet text-white font-semibold text-label-sm shadow-card hover:opacity-90 transition-opacity"
+              >
+                <Plus size={16} />
+                Add Your First Medication
+              </button>
+            )}
           </div>
         )}
 
         {/* TAB 3: All medications list */}
         {tab === "all" && (
-          <div className="space-y-3 animate-fade-in">
-            {meds.map((med) => {
-              const c = conditionColors[med.conditionId];
-              return (
-                <div key={med.id} className="bg-bg-card rounded-xl p-4 shadow-card flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg" style={{ background: c?.bg }}>
-                      {c?.emoji}
+          meds.length === 0 ? (
+            <div className="bg-bg-card rounded-2xl p-8 shadow-card text-center space-y-4">
+              <div className="w-16 h-16 rounded-2xl bg-accent-violet/10 text-accent-violet flex items-center justify-center mx-auto">
+                <Pill size={32} />
+              </div>
+              <div className="space-y-1">
+                <h3 className="font-bold text-title-md text-text-primary">No Prescriptions Registered</h3>
+                <p className="text-body-sm text-text-secondary max-w-sm mx-auto">
+                  Keep your chronic care regimen organized by recording your active prescriptions and schedules.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowAdd(true)}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl gradient-violet text-white font-semibold text-label-sm shadow-card hover:opacity-90 transition-opacity"
+              >
+                <Plus size={16} />
+                Add Prescription
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-3 animate-fade-in">
+              {meds.map((med) => {
+                const c = conditionColors[med.conditionId];
+                return (
+                  <div key={med.id} className="bg-bg-card rounded-xl p-4 shadow-card flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg" style={{ background: c?.bg }}>
+                        {c?.emoji}
+                      </div>
+                      <div>
+                        <p className="font-semibold text-title-sm text-text-primary">{med.name}</p>
+                        <p className="text-xs text-text-secondary">{med.dosage} · Scheduled at {med.scheduledAt}</p>
+                        <p className="text-xs text-text-tertiary mt-0.5">{c?.label}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-semibold text-title-sm text-text-primary">{med.name}</p>
-                      <p className="text-xs text-text-secondary">{med.dosage} · Scheduled at {med.scheduledAt}</p>
-                      <p className="text-xs text-text-tertiary mt-0.5">{c?.label}</p>
-                    </div>
+                    <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-bg-light text-text-secondary capitalize">
+                      {med.status}
+                    </span>
                   </div>
-                  <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-bg-light text-text-secondary capitalize">
-                    {med.status}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )
         )}
 
         {/* Add Medication Modal */}

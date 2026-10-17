@@ -16,11 +16,75 @@ import {
 } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
 
-// ─── patient_profiles ─────────────────────────────────────────────────────────
+// ─── profiles (Firebase synced users) ─────────────────────────────────────────
+
+export const profiles = pgTable("profiles", {
+  id:                text("id").primaryKey(),                  // Firebase UID
+  email:             text("email").notNull(),
+  displayName:       text("display_name"),
+  photoUrl:          text("photo_url"),
+  createdAt:         timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt:         timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  lastReportSentAt:  timestamp("last_report_sent_at", { withTimezone: true }),
+  onboardingComplete: boolean("onboarding_complete").default(false),
+  dateOfBirth:       date("date_of_birth"),
+  conditions:        text("conditions").array().default(sql`'{}'`),
+  emergencyContact:  jsonb("emergency_contact"),
+  latitude:          numeric("latitude"),
+  longitude:         numeric("longitude"),
+  city:              text("city"),
+  region:            text("region"),
+  country:           text("country"),
+  locationUpdatedAt: timestamp("location_updated_at", { withTimezone: true }),
+});
+
+// ─── vitals ───────────────────────────────────────────────────────────────────
+
+export const vitals = pgTable("vitals", {
+  id:         uuid("id").primaryKey().defaultRandom(),
+  userId:     text("user_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+  type:       text("type").notNull(),
+  value:      numeric("value").notNull(),
+  unit:       text("unit").notNull(),
+  source:     text("source").notNull().default("manual"),
+  recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull().defaultNow(),
+  notes:      text("notes"),
+  createdAt:  timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+// ─── glucose_readings ─────────────────────────────────────────────────────────
+
+export const glucoseReadings = pgTable("glucose_readings", {
+  id:          uuid("id").primaryKey().defaultRandom(),
+  userId:      text("user_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+  value:       numeric("value").notNull(),
+  unit:        text("unit").notNull().default("mg/dL"),
+  mealContext: text("meal_context").default("fasting"),
+  source:      text("source").notNull().default("manual"),
+  notes:       text("notes"),
+  recordedAt:  timestamp("recorded_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt:   timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+// ─── reports ──────────────────────────────────────────────────────────────────
+
+export const reports = pgTable("reports", {
+  id:             uuid("id").primaryKey().defaultRandom(),
+  userId:         text("user_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+  reportType:     text("report_type").notNull().default("monthly_summary"),
+  dateRangeStart: timestamp("date_range_start", { withTimezone: true }).notNull(),
+  dateRangeEnd:   timestamp("date_range_end", { withTimezone: true }).notNull(),
+  status:         text("status").notNull().default("completed"),
+  recipientEmail: text("recipient_email"),
+  fileUrl:        text("file_url"),
+  createdAt:      timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+// ─── patient_profiles (legacy) ─────────────────────────────────────────────────
 
 export const patientProfiles = pgTable("patient_profiles", {
   id:               uuid("id").primaryKey().defaultRandom(),
-  userId:           text("user_id").notNull().unique(),       // Clerk user ID
+  userId:           text("user_id").notNull().unique(),       // User ID
   name:             text("name").notNull(),
   dateOfBirth:      date("date_of_birth").notNull(),
   conditions:       text("conditions").array().notNull().default(sql`'{}'`),
@@ -61,13 +125,19 @@ export const medications = pgTable("medications", {
 // ─── medication_logs ──────────────────────────────────────────────────────────
 
 export const medicationLogs = pgTable("medication_logs", {
-  id:            uuid("id").primaryKey().defaultRandom(),
-  medicationId:  uuid("medication_id").notNull().references(() => medications.id, { onDelete: "cascade" }),
-  patientId:     uuid("patient_id").notNull().references(() => patientProfiles.id, { onDelete: "cascade" }),
-  status:        text("status").notNull(),
-  scheduledAt:   timestamp("scheduled_at", { withTimezone: true }).notNull(),
-  loggedAt:      timestamp("logged_at", { withTimezone: true }).defaultNow(),
-  skippedReason: text("skipped_reason"),
+  id:             uuid("id").primaryKey().defaultRandom(),
+  userId:         text("user_id").references(() => profiles.id, { onDelete: "cascade" }),
+  medicationId:   uuid("medication_id").references(() => medications.id, { onDelete: "cascade" }),
+  patientId:      uuid("patient_id").references(() => patientProfiles.id, { onDelete: "cascade" }),
+  medicationName: text("medication_name"),
+  dosage:         text("dosage"),
+  frequency:      text("frequency"),
+  status:         text("status").notNull().default("taken"),
+  scheduledAt:    timestamp("scheduled_at", { withTimezone: true }).notNull(),
+  loggedAt:       timestamp("logged_at", { withTimezone: true }).defaultNow(),
+  skippedReason:  text("skipped_reason"),
+  notes:          text("notes"),
+  createdAt:      timestamp("created_at", { withTimezone: true }).defaultNow(),
 });
 
 // ─── alert_events ─────────────────────────────────────────────────────────────
@@ -210,6 +280,14 @@ export const reminderRelations = relations(followUpReminders, ({ one }) => ({
 
 // ─── TypeScript types inferred from schema ────────────────────────────────────
 
+export type Profile             = typeof profiles.$inferSelect;
+export type NewProfile          = typeof profiles.$inferInsert;
+export type Vital               = typeof vitals.$inferSelect;
+export type NewVital            = typeof vitals.$inferInsert;
+export type GlucoseReading      = typeof glucoseReadings.$inferSelect;
+export type NewGlucoseReading   = typeof glucoseReadings.$inferInsert;
+export type Report              = typeof reports.$inferSelect;
+export type NewReport           = typeof reports.$inferInsert;
 export type PatientProfile      = typeof patientProfiles.$inferSelect;
 export type NewPatientProfile    = typeof patientProfiles.$inferInsert;
 export type Reading             = typeof readings.$inferSelect;

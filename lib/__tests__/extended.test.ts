@@ -201,7 +201,7 @@ describe("HMAC webhook signature", () => {
 
 // ─── Deduplication logic ──────────────────────────────────────────────────────
 
-describe("Wearable reading deduplication", () => {
+describe("Biometric reading deduplication", () => {
   function dedup(readings: Array<{ type: string; recordedAt: string }>): typeof readings {
     const seen = new Set<string>();
     return readings.filter((r) => {

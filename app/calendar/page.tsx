@@ -10,9 +10,10 @@ import {
 } from "date-fns";
 import {
   ChevronLeft, ChevronRight, Download, Activity, Pill, BookOpen,
-  AlertTriangle, Bell, Plus, CheckCircle2, X, Calendar as CalendarIcon, Clock
+  AlertTriangle, Bell, Plus, CheckCircle2, X, Calendar as CalendarIcon, Clock, Loader2
 } from "lucide-react";
 import { clsx } from "clsx";
+import { useAuth } from "@/context/AuthContext";
 
 interface DayData {
   date: Date;
@@ -32,61 +33,17 @@ interface FollowUpItem {
   status: "pending" | "completed" | "dismissed";
 }
 
-const MOCK_INITIAL_REMINDERS: FollowUpItem[] = [
-  {
-    id: "r1",
-    title: "Recheck Blood Pressure Trajectory",
-    description: "Measure seated morning BP for 3 consecutive days prior to next appointment.",
-    dueDate: addDays(new Date(), 3).toISOString(),
-    reminderType: "general",
-    status: "pending",
-  },
-  {
-    id: "r2",
-    title: "Schedule Quarterly HbA1c Lab Panel",
-    description: "Lab test required to assess glycemic control before next clinical review.",
-    dueDate: addDays(new Date(), 14).toISOString(),
-    reminderType: "lab_test",
-    status: "pending",
-  },
-  {
-    id: "r3",
-    title: "Medication Review & Refill Check",
-    description: "Review Metformin and Lisinopril supply with pharmacy.",
-    dueDate: addDays(new Date(), 21).toISOString(),
-    reminderType: "medication_review",
-    status: "pending",
-  },
-];
-
-// Generate mock data for days
-function generateMockCalendarData(): Map<string, DayData> {
-  const map = new Map<string, DayData>();
-  const today = new Date();
-  for (let i = 0; i < 365; i++) {
-    const date = subDays(today, i);
-    const key = format(date, "yyyy-MM-dd");
-    map.set(key, {
-      date,
-      hasReadings: Math.random() > 0.2,
-      hasMedications: Math.random() > 0.15,
-      hasSymptoms: Math.random() > 0.7,
-      hasAlerts: Math.random() > 0.85,
-      adherence: Math.floor(Math.random() * 101),
-    });
-  }
-  return map;
-}
-
-const MOCK_DATA = generateMockCalendarData();
 const DOW_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 export default function CalendarPage() {
+  const { user } = useAuth();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [rangeStart, setRangeStart] = useState<Date | null>(null);
   const [rangeEnd, setRangeEnd] = useState<Date | null>(null);
   const [hoverDate, setHoverDate] = useState<Date | null>(null);
-  const [reminders, setReminders] = useState<FollowUpItem[]>(MOCK_INITIAL_REMINDERS);
+  const [reminders, setReminders] = useState<FollowUpItem[]>([]);
+  const [calendarDayData, setCalendarDayData] = useState<Map<string, DayData>>(() => new Map());
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [selectedReminder, setSelectedReminder] = useState<FollowUpItem | null>(null);
   const [showAddReminderModal, setShowAddReminderModal] = useState(false);
   const [isSavingReminder, setIsSavingReminder] = useState(false);
@@ -99,6 +56,13 @@ export default function CalendarPage() {
 
   const today = new Date();
   const MAX_RANGE_DAYS = 30;
+
+  // Calendar day grid
+  const monthStart = startOfMonth(currentMonth);
+  const monthEnd = endOfMonth(currentMonth);
+  const calStart = startOfWeek(monthStart);
+  const calEnd = endOfWeek(monthEnd);
+  const days = eachDayOfInterval({ start: calStart, end: calEnd });
 
   // Load reminders from API
   useEffect(() => {
@@ -115,17 +79,50 @@ export default function CalendarPage() {
             status: r.status,
           }));
           setReminders(mapped);
+        } else {
+          setReminders([]);
         }
       })
-      .catch(() => {});
+      .catch(() => {
+        setReminders([]);
+      });
   }, []);
 
-  // Calendar day grid
-  const monthStart = startOfMonth(currentMonth);
-  const monthEnd = endOfMonth(currentMonth);
-  const calStart = startOfWeek(monthStart);
-  const calEnd = endOfWeek(monthEnd);
-  const days = eachDayOfInterval({ start: calStart, end: calEnd });
+  // Fetch live biometric readings for the visible calendar grid interval
+  useEffect(() => {
+    const startStr = calStart.toISOString();
+    const endStr = calEnd.toISOString();
+    fetch(`/api/v1/readings?rangeStart=${encodeURIComponent(startStr)}&rangeEnd=${encodeURIComponent(endStr)}&limit=500`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json) => {
+        if (json?.data?.length) {
+          const map = new Map<string, DayData>();
+          for (const item of json.data) {
+            const dateStr = item.recordedAt ? item.recordedAt.slice(0, 10) : "";
+            if (!dateStr) continue;
+            const existing = map.get(dateStr) || {
+              date: new Date(dateStr),
+              hasReadings: false,
+              hasMedications: false,
+              hasSymptoms: false,
+              hasAlerts: false,
+              adherence: 100,
+            };
+            existing.hasReadings = true;
+            if (item.alerts && item.alerts.length > 0) {
+              existing.hasAlerts = true;
+            }
+            map.set(dateStr, existing);
+          }
+          setCalendarDayData(map);
+        } else {
+          setCalendarDayData(new Map());
+        }
+      })
+      .catch(() => {
+        setCalendarDayData(new Map());
+      });
+  }, [currentMonth]);
 
   const handleDayClick = useCallback((date: Date) => {
     if (!rangeStart || (rangeStart && rangeEnd)) {
@@ -155,7 +152,7 @@ export default function CalendarPage() {
   const isRangeStart = (date: Date) => rangeStart ? isSameDay(date, rangeStart) : false;
   const isRangeEnd   = (date: Date) => rangeEnd   ? isSameDay(date, rangeEnd)   : false;
 
-  const getDayData = (date: Date) => MOCK_DATA.get(format(date, "yyyy-MM-dd"));
+  const getDayData = (date: Date) => calendarDayData.get(format(date, "yyyy-MM-dd"));
   const getDayReminders = (date: Date) =>
     reminders.filter((r) => isSameDay(new Date(r.dueDate), date) && r.status === "pending");
 
@@ -230,14 +227,40 @@ export default function CalendarPage() {
       alert("Please select a date range first.");
       return;
     }
+    setIsExportingPdf(true);
     try {
-      const { generateCuraSyncMetricsPDF } = await import("@/lib/pdf");
-      await generateCuraSyncMetricsPDF();
-    } catch (error) {
+      const startStr = format(rangeStart, "yyyy-MM-dd");
+      const endStr = format(rangeEnd, "yyyy-MM-dd");
+      const token = user ? await user.getIdToken() : null;
+      const headers: Record<string, string> = {};
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+
+      const res = await fetch(
+        `/api/v1/export/date-range?rangeStart=${encodeURIComponent(startStr)}&rangeEnd=${encodeURIComponent(endStr)}`,
+        { headers }
+      );
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || `Export failed with status ${res.status}`);
+      }
+
+      const blob = await res.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.download = `CuraSync_Report_${startStr}_to_${endStr}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(downloadUrl);
+    } catch (error: any) {
       console.error("PDF export error:", error);
-      alert("PDF report generated.");
+      alert(error?.message || "Failed to generate date-range PDF export.");
+    } finally {
+      setIsExportingPdf(false);
     }
-  }, [rangeStart, rangeEnd]);
+  }, [rangeStart, rangeEnd, user]);
 
   const pendingReminders = reminders
     .filter((r) => r.status === "pending")
@@ -266,10 +289,20 @@ export default function CalendarPage() {
             {rangeStart && rangeEnd && (
               <button
                 onClick={handlePdfExport}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-bg-card border border-divider text-text-primary text-xs font-semibold shadow-card hover:bg-bg-light transition-colors"
+                disabled={isExportingPdf}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-bg-card border border-divider text-text-primary text-xs font-semibold shadow-card hover:bg-bg-light transition-colors disabled:opacity-50"
               >
-                <Download size={15} />
-                <span>Export PDF</span>
+                {isExportingPdf ? (
+                  <>
+                    <Loader2 size={15} className="animate-spin text-accent-violet" />
+                    <span>Compiling PDF...</span>
+                  </>
+                ) : (
+                  <>
+                    <Download size={15} />
+                    <span>Export PDF</span>
+                  </>
+                )}
               </button>
             )}
           </div>

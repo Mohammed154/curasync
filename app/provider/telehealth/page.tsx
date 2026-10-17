@@ -20,71 +20,77 @@ interface ProviderConsultation {
   notes?: string;
 }
 
-const MOCK_PROVIDER_CONSULTATIONS: ProviderConsultation[] = [
-  {
-    id: "c1",
-    patientId: "pat_001",
-    patientName: "Arjun Mehta",
-    age: 58,
-    conditions: ["Type 2 Diabetes", "Hypertension"],
-    scheduledAt: new Date(Date.now() + 1000 * 60 * 15).toISOString(),
-    durationMin: 20,
-    status: "scheduled",
-    roomUrl: "https://curasync.daily.co/dr-priya-consultation",
-    roomName: "dr-priya-consultation",
-    notes: "Review recent elevated systolic BP and metformin titration.",
-  },
-  {
-    id: "c2",
-    patientId: "pat_002",
-    patientName: "Sunita Patel",
-    age: 64,
-    conditions: ["CKD Stage 3A", "Hypertension"],
-    scheduledAt: addDays(new Date(), 1).toISOString(),
-    durationMin: 30,
-    status: "scheduled",
-    roomUrl: "https://curasync.daily.co/sunita-patel-review",
-    roomName: "sunita-patel-review",
-    notes: "Review quarterly metabolic panel and eGFR trajectory.",
-  },
-];
-
 export default function ProviderTelehealthPage() {
-  const [consultations, setConsultations] = useState<ProviderConsultation[]>(MOCK_PROVIDER_CONSULTATIONS);
+  const [consultations, setConsultations] = useState<ProviderConsultation[]>([]);
   const [activeRoom, setActiveRoom] = useState<ProviderConsultation | null>(null);
 
   useEffect(() => {
     fetch("/api/v1/consultations?role=provider")
       .then((res) => (res.ok ? res.json() : null))
       .then((json) => {
-        if (json?.data?.length) {
+        if (json?.data && Array.isArray(json.data)) {
           const mapped: ProviderConsultation[] = json.data.map((c: any) => ({
             id: c.id,
             patientId: c.patientId,
-            patientName: "Arjun Mehta",
-            age: 58,
-            conditions: ["Type 2 Diabetes", "Hypertension"],
+            patientName: c.patientName || "Patient",
+            age: c.age || 50,
+            conditions: c.conditions || ["Chronic Care"],
             scheduledAt: c.scheduledAt,
-            durationMin: c.durationMin,
+            durationMin: c.durationMin || 20,
             status: c.status,
             roomUrl: c.roomUrl || `https://curasync.daily.co/${c.roomName}`,
             roomName: c.roomName || "consultation-room",
             notes: c.notes,
           }));
           setConsultations(mapped);
+        } else {
+          setConsultations([]);
         }
       })
-      .catch(() => {});
+      .catch(() => {
+        setConsultations([]);
+      });
   }, []);
 
-  const handleStartCall = (consultation: ProviderConsultation) => {
-    fetch("/api/v1/consultations", {
-      method: "PATCH",
+  useEffect(() => {
+    // Send presence heartbeat to declare doctor is available on the platform
+    fetch("/api/v1/telehealth/presence", {
+      method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ consultationId: consultation.id, status: "in_progress" }),
+      body: JSON.stringify({ status: "available" }),
     }).catch(() => {});
 
-    setActiveRoom(consultation);
+    const interval = setInterval(() => {
+      fetch("/api/v1/telehealth/presence", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "available" }),
+      }).catch(() => {});
+    }, 45_000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleStartCall = async (consultation: ProviderConsultation) => {
+    try {
+      const res = await fetch("/api/v1/telehealth/token?role=provider", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ roomName: consultation.roomName, consultationId: consultation.id }),
+      });
+      const json = await res.json();
+      const token = json.token;
+
+      fetch("/api/v1/consultations", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ consultationId: consultation.id, status: "in_progress" }),
+      }).catch(() => {});
+
+      setActiveRoom({ ...consultation, roomUrl: json.roomUrl || consultation.roomUrl, token } as any);
+    } catch {
+      setActiveRoom(consultation);
+    }
   };
 
   if (activeRoom) {
@@ -92,6 +98,7 @@ export default function ProviderTelehealthPage() {
       <VideoRoom
         roomUrl={activeRoom.roomUrl}
         roomName={activeRoom.roomName}
+        token={(activeRoom as any).token}
         patientName={activeRoom.patientName}
         providerName="Dr. Priya Sharma"
         onLeave={() => setActiveRoom(null)}
@@ -118,7 +125,7 @@ export default function ProviderTelehealthPage() {
             onClick={() => handleStartCall({
               id: "instant_provider_call",
               patientId: "pat_001",
-              patientName: "Arjun Mehta",
+              patientName: "Patient Alpha",
               age: 58,
               conditions: ["Type 2 Diabetes", "Hypertension"],
               scheduledAt: new Date().toISOString(),
@@ -141,8 +148,19 @@ export default function ProviderTelehealthPage() {
             Scheduled Telehealth Queue ({consultations.length})
           </h2>
 
-          <div className="space-y-3">
-            {consultations.map((call) => (
+          {consultations.length === 0 ? (
+            <div className="bg-bg-card rounded-xl p-8 border border-divider shadow-card text-center space-y-3">
+              <div className="w-12 h-12 rounded-xl bg-bg-lavender flex items-center justify-center mx-auto text-accent-violet">
+                <Video size={22} />
+              </div>
+              <p className="font-semibold text-sm text-text-primary">No appointments scheduled</p>
+              <p className="text-xs text-text-tertiary max-w-sm mx-auto">
+                There are currently no telehealth video consultations queued in your provider schedule.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {consultations.map((call) => (
               <div
                 key={call.id}
                 className="bg-bg-card rounded-xl p-5 border border-divider shadow-card flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 card-enter"
@@ -192,7 +210,8 @@ export default function ProviderTelehealthPage() {
                 </div>
               </div>
             ))}
-          </div>
+            </div>
+          )}
         </div>
       </div>
     </AppShell>

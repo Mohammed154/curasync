@@ -26,7 +26,7 @@ export default function MedicineAdvisorPage() {
     {
       id: "welcome",
       sender: "advisor",
-      text: "Hello Arjun! I'm your AI Medicine Advisor. You can ask me about any medication's purpose, common usage guidelines, or upload a photo of a medicine strip/box for explanation.\n\n*Note: I provide general drug education, not medical prescriptions.*",
+      text: "Hello! I'm your AI Medicine Advisor. You can ask me about any medication's purpose, common usage guidelines, or upload a photo of a medicine strip/box for explanation.\n\n*Note: I provide general drug education, not medical prescriptions.*",
       timestamp: new Date(),
     },
   ]);

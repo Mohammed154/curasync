@@ -152,7 +152,7 @@ export default function OnboardingMedicationsPage() {
             <ArrowLeft size={18} aria-hidden="true" />
             Back
           </Link>
-          <Link href="/onboarding/devices" className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl gradient-violet text-white font-semibold text-body-md hover:opacity-90 transition-opacity">
+          <Link href="/onboarding/location" className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl gradient-violet text-white font-semibold text-body-md hover:opacity-90 transition-opacity">
             Continue
             <ArrowRight size={18} aria-hidden="true" />
           </Link>

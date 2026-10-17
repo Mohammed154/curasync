@@ -9,7 +9,7 @@ const CHECKLIST = [
   { label: "Conditions selected", done: true },
   { label: "Baseline metrics entered", done: true },
   { label: "Medications added", done: true },
-  { label: "Wearable connected", done: true },
+  { label: "Geographic metadata configured", done: true },
 ];
 
 export default function OnboardingCompletePage() {
@@ -39,7 +39,7 @@ export default function OnboardingCompletePage() {
         <div className="mb-8">
           <p className="text-accent-lavender text-xs font-semibold uppercase tracking-widest mb-2">Setup complete 🎉</p>
           <h1 className="text-white font-bold mb-3" style={{ fontSize: "clamp(28px, 6vw, 36px)", lineHeight: 1.15 }}>
-            You&apos;re all set,<br />Arjun!
+            You&apos;re all set!
           </h1>
           <p className="text-white/60 text-sm leading-relaxed">
             CuraSync is now configured for your 3 conditions. Your dashboard is ready with live metrics and personalised alerts.

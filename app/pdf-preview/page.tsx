@@ -5,9 +5,11 @@
 // No auth session needed — token IS the auth.
 
 import React from "react";
-import { getMockDashboardData } from "@/lib/mock-data";
+import { db, patientProfiles, readings, medications, alertEvents } from "@/lib/db";
 import { conditionColors } from "@/lib/design-tokens";
 import { format, subDays } from "date-fns";
+import { eq, and, gte, lte, desc } from "drizzle-orm";
+import type { ConditionId } from "@/types";
 
 interface Props {
   searchParams: Promise<{ patientId?: string; rangeStart?: string; rangeEnd?: string }>;
@@ -15,14 +17,65 @@ interface Props {
 
 export default async function PdfPreviewPage({ searchParams }: Props) {
   const params = await searchParams;
-  const data = getMockDashboardData();
-  const { patient, latestReadings, conditionSummaries, weeklyAdherence, todayMedications, activeAlerts } = data;
 
   const rangeStart = params.rangeStart ?? format(subDays(new Date(), 30), "yyyy-MM-dd");
   const rangeEnd   = params.rangeEnd   ?? format(new Date(), "yyyy-MM-dd");
   const generatedAt = format(new Date(), "MMMM d, yyyy 'at' h:mm a");
 
-  const age = new Date().getFullYear() - parseInt(patient.dateOfBirth.slice(0, 4));
+  let patient = {
+    name: "Patient",
+    dateOfBirth: "",
+    conditions: [] as ConditionId[],
+    emergencyContact: { name: "--", phone: "--", relationship: "--" },
+  };
+  let latestReadings = {
+    bloodGlucose: "--",
+    systolic: "--",
+    diastolic: "--",
+    weight: "--",
+  };
+  let weeklyAdherence = 100;
+  let todayMedications: Array<{ id: string; name: string; dosage: string; status: string }> = [];
+  let activeAlerts: Array<{ id: string; severity: string; message: string; value: string; triggeredAt: Date }> = [];
+  let conditionSummaries: any[] = [];
+
+  if (params.patientId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(params.patientId)) {
+    try {
+      const patId = params.patientId as `${string}-${string}-${string}-${string}-${string}`;
+      const [p] = await db.select().from(patientProfiles).where(eq(patientProfiles.id, patId)).limit(1);
+      if (p) {
+        patient = {
+          name: p.name,
+          dateOfBirth: p.dateOfBirth ?? "",
+          conditions: (p.conditions as ConditionId[]) || [],
+          emergencyContact: (p.emergencyContact as any) || { name: "--", phone: "--", relationship: "--" },
+        };
+      }
+      const [rReadings, rMeds, rAlerts] = await Promise.all([
+        db.select().from(readings).where(and(eq(readings.patientId, patId), gte(readings.recordedAt, new Date(rangeStart)), lte(readings.recordedAt, new Date(rangeEnd)))).orderBy(desc(readings.recordedAt)),
+        db.select().from(medications).where(and(eq(medications.patientId, patId), eq(medications.active, true))),
+        db.select().from(alertEvents).where(and(eq(alertEvents.patientId, patId), eq(alertEvents.status, "active"))),
+      ]);
+
+      const glucose = rReadings.find((r) => r.type === "blood_glucose");
+      if (glucose) latestReadings.bloodGlucose = String(Math.round(parseFloat(glucose.value)));
+      const sys = rReadings.find((r) => r.type === "blood_pressure_systolic");
+      const dia = rReadings.find((r) => r.type === "blood_pressure_diastolic");
+      if (sys) latestReadings.systolic = String(Math.round(parseFloat(sys.value)));
+      if (dia) latestReadings.diastolic = String(Math.round(parseFloat(dia.value)));
+      const wt = rReadings.find((r) => r.type === "weight");
+      if (wt) latestReadings.weight = String(parseFloat(wt.value));
+
+      todayMedications = rMeds.map((m) => ({ id: m.id, name: m.name, dosage: m.dosage, status: "active" }));
+      activeAlerts = rAlerts.map((a) => ({ id: a.id, severity: a.severity, message: a.message, value: a.value ?? "--", triggeredAt: a.triggeredAt ?? new Date() }));
+    } catch (err) {
+      console.error("[pdf-preview] DB error:", err);
+    }
+  }
+
+  const birthYear = patient.dateOfBirth ? parseInt(patient.dateOfBirth.slice(0, 4)) : NaN;
+  const age = !isNaN(birthYear) ? new Date().getFullYear() - birthYear : "--";
+  const dobText = patient.dateOfBirth ? format(new Date(patient.dateOfBirth), "MMM d, yyyy") : "Not recorded";
 
   return (
     <html lang="en">
@@ -95,7 +148,7 @@ export default async function PdfPreviewPage({ searchParams }: Props) {
                 <div className="card-label">Patient Name</div>
                 <div style={{ fontSize: 16, fontWeight: 700 }}>{patient.name}</div>
                 <div style={{ fontSize: 10, color: "#8888A8", marginTop: 2 }}>
-                  Age {age} · DOB {format(new Date(patient.dateOfBirth), "MMM d, yyyy")}
+                  Age {age} · DOB: {dobText}
                 </div>
               </div>
               <div className="card">
@@ -122,8 +175,8 @@ export default async function PdfPreviewPage({ searchParams }: Props) {
             <div className="section-title">Latest Biometric Readings</div>
             <div className="grid-3">
               {[
-                { label: "Blood Glucose", value: latestReadings.bloodGlucose, unit: "mg/dL", status: latestReadings.bloodGlucose > 180 ? "amber" : "green" },
-                { label: "Blood Pressure", value: `${latestReadings.systolic}/${latestReadings.diastolic}`, unit: "mmHg", status: latestReadings.systolic > 140 ? "amber" : "green" },
+                { label: "Blood Glucose", value: latestReadings.bloodGlucose, unit: "mg/dL", status: parseFloat(latestReadings.bloodGlucose) > 180 ? "amber" : "green" },
+                { label: "Blood Pressure", value: `${latestReadings.systolic}/${latestReadings.diastolic}`, unit: "mmHg", status: parseFloat(latestReadings.systolic) > 140 ? "amber" : "green" },
                 { label: "Weight", value: latestReadings.weight, unit: "kg", status: "green" },
                 { label: "Medication Adherence", value: `${weeklyAdherence}%`, unit: "this week", status: weeklyAdherence >= 80 ? "green" : "amber" },
               ].map((v) => (
@@ -211,7 +264,7 @@ export default async function PdfPreviewPage({ searchParams }: Props) {
           </div>
 
           <div className="disclaimer">
-            ⚕️ <strong>Clinical Disclaimer:</strong> This report is generated from patient self-reported data and connected wearable devices.
+            ⚕️ <strong>Clinical Disclaimer:</strong> This report is generated from patient self-reported and user-logged records.
             Values should be interpreted in clinical context. This report does not constitute a medical diagnosis.
             For emergencies, call 112. CuraSync is not a substitute for professional medical advice.
           </div>

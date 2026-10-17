@@ -1,39 +1,21 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import AppShell from "@/components/layout/AppShell";
 import GlucoseChart from "@/components/charts/GlucoseChart";
 import SymptomHeatmap from "@/components/provider/SymptomHeatmap";
 import AlertThresholdCustomizer from "@/components/provider/AlertThresholdCustomizer";
-import { getMockDashboardData, getMockProviderPanel } from "@/lib/mock-data";
 import { conditionColors } from "@/lib/design-tokens";
-import { ArrowLeft, Download, MessageSquare, AlertTriangle, CheckCircle2, Clock, Pill, Activity, FileText, BookOpen, Sliders, Video, Loader2 } from "lucide-react";
+import { ArrowLeft, Download, MessageSquare, AlertTriangle, CheckCircle2, Clock, Pill, Activity, FileText, BookOpen, Sliders, Video, Loader2, UserX } from "lucide-react";
 import Link from "next/link";
 import { clsx } from "clsx";
-import { format, subDays } from "date-fns";
+import { format } from "date-fns";
 import { requestPdfExport } from "@/hooks/useApi";
+import type { ProviderPatientRow } from "@/types";
 
 interface Props {
   params: Promise<{ id: string }>;
 }
-
-const TIMELINE_EVENTS = [
-  { id: "t1", type: "reading", icon: "🩸", label: "Blood Glucose logged", value: "142 mg/dL", time: new Date(Date.now() - 1000*60*30), status: "amber" as const },
-  { id: "t2", type: "medication", icon: "💊", label: "Metformin 500mg taken", value: "On time", time: new Date(Date.now() - 1000*60*60*2), status: "green" as const },
-  { id: "t3", type: "reading", icon: "💉", label: "Blood Pressure logged", value: "138/88 mmHg", time: new Date(Date.now() - 1000*60*60*3), status: "amber" as const },
-  { id: "t4", type: "medication", icon: "💊", label: "Amlodipine 5mg taken", value: "On time", time: new Date(Date.now() - 1000*60*60*9), status: "green" as const },
-  { id: "t5", type: "alert", icon: "⚠️", label: "BP trending above target", value: "138/88 mmHg", time: new Date(Date.now() - 1000*60*60*10), status: "amber" as const },
-  { id: "t6", type: "symptom", icon: "📝", label: "Symptom logged", value: "Mild dizziness (4/10)", time: new Date(Date.now() - 1000*60*60*27), status: "amber" as const },
-  { id: "t7", type: "medication", icon: "💊", label: "Metformin 500mg — Missed", value: "Missed dose", time: new Date(Date.now() - 1000*60*60*45), status: "red" as const },
-];
-
-const LAB_RESULTS = [
-  { name: "HbA1c", value: "7.4%", date: "Apr 10, 2026", trend: "down", ref: "Target < 7.0%", status: "amber" as const },
-  { name: "eGFR", value: "48 mL/min", date: "Apr 10, 2026", trend: "stable", ref: "Stage 3A CKD", status: "amber" as const },
-  { name: "Creatinine", value: "1.6 mg/dL", date: "Apr 10, 2026", trend: "stable", ref: "Normal: 0.7–1.3", status: "amber" as const },
-  { name: "LDL Cholesterol", value: "112 mg/dL", date: "Mar 5, 2026", trend: "down", ref: "Target < 100", status: "amber" as const },
-  { name: "Blood Pressure", value: "138/88 mmHg", date: "Today", trend: "up", ref: "Target < 130/80", status: "amber" as const },
-];
 
 const STATUS_COLORS = {
   green: "#00B894", amber: "#F39C12", red: "#D63031",
@@ -47,13 +29,31 @@ const STATUS_BADGE = {
 
 export default function ProviderPatientDetailPage({ params }: Props) {
   const { id } = React.use(params);
-  const { recentReadings, todayMedications, weeklyAdherence } = getMockDashboardData();
-  const patients = getMockProviderPanel();
-  const patient = patients.find((p) => p.patientId === id) ?? patients[0]!;
+  const [patient, setPatient] = useState<ProviderPatientRow | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [tab, setTab] = useState<"timeline" | "medications" | "labs" | "symptoms" | "thresholds" | "notes">("timeline");
   const [providerNote, setProviderNote] = useState("");
   const [notes, setNotes] = useState<string[]>([]);
   const [exportingPdf, setExportingPdf] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/v1/patients")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json) => {
+        if (json?.data && Array.isArray(json.data)) {
+          const matched = json.data.find((p: ProviderPatientRow) => p.patientId === id);
+          setPatient(matched || null);
+        } else {
+          setPatient(null);
+        }
+      })
+      .catch(() => {
+        setPatient(null);
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
+  }, [id]);
 
   const handleExportPdf = async () => {
     if (exportingPdf) return;
@@ -68,7 +68,41 @@ export default function ProviderPatientDetailPage({ params }: Props) {
     }
   };
 
-  const takenCount = todayMedications.filter((m) => m.status === "taken").length;
+  if (isLoading) {
+    return (
+      <AppShell role="provider">
+        <div className="max-w-4xl mx-auto px-4 lg:px-6 py-20 flex flex-col items-center justify-center gap-3 text-text-tertiary">
+          <Loader2 size={32} className="animate-spin text-accent-violet" />
+          <p className="text-sm">Loading patient clinical record…</p>
+        </div>
+      </AppShell>
+    );
+  }
+
+  if (!patient) {
+    return (
+      <AppShell role="provider">
+        <div className="max-w-md mx-auto px-4 py-24 text-center space-y-4">
+          <div className="w-16 h-16 rounded-2xl bg-text-tertiary/10 text-text-tertiary flex items-center justify-center mx-auto">
+            <UserX size={32} />
+          </div>
+          <div className="space-y-1">
+            <h2 className="font-bold text-title-lg text-text-primary">Patient Not Found</h2>
+            <p className="text-body-sm text-text-secondary">
+              The requested patient record could not be found or has not been linked to your clinical panel yet.
+            </p>
+          </div>
+          <Link
+            href="/provider"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl gradient-violet text-white font-semibold text-label-sm shadow-card hover:opacity-90 transition-opacity"
+          >
+            <ArrowLeft size={16} />
+            <span>Return to Patient Panel</span>
+          </Link>
+        </div>
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell role="provider">
@@ -183,33 +217,16 @@ export default function ProviderPatientDetailPage({ params }: Props) {
         {/* Timeline tab */}
         {tab === "timeline" && (
           <div className="space-y-4">
-            <GlucoseChart data={recentReadings} />
+            <GlucoseChart data={[]} />
             <div className="bg-bg-card rounded-xl shadow-card overflow-hidden">
               <div className="px-4 py-3 border-b border-divider">
                 <h3 className="font-semibold text-title-md text-text-primary">Health Timeline</h3>
                 <p className="text-xs text-text-tertiary mt-0.5">All biometrics, medications, and symptoms</p>
               </div>
-              <div className="relative">
-                {/* Timeline line */}
-                <div className="absolute left-8 top-0 bottom-0 w-px bg-divider" aria-hidden="true" />
-                {TIMELINE_EVENTS.map((event) => (
-                  <div key={event.id} className="flex items-start gap-4 px-4 py-3 hover:bg-bg-light/50 transition-colors border-b border-divider last:border-0">
-                    <div
-                      className="w-8 h-8 rounded-full flex items-center justify-center text-base flex-shrink-0 z-10 border-2 border-bg-card"
-                      style={{ background: event.status === "green" ? "#E8F8F5" : event.status === "amber" ? "#FEF9E7" : "#FDECEA" }}
-                      aria-hidden="true"
-                    >
-                      {event.icon}
-                    </div>
-                    <div className="flex-1 min-w-0 pt-0.5">
-                      <p className="font-medium text-label-sm text-text-primary">{event.label}</p>
-                      <p className="text-xs text-text-secondary mt-0.5">{event.value}</p>
-                    </div>
-                    <p className="text-xs text-text-tertiary flex-shrink-0 pt-0.5">
-                      {format(event.time, "h:mm a")}
-                    </p>
-                  </div>
-                ))}
+              <div className="py-12 flex flex-col items-center justify-center text-center gap-2 text-text-tertiary">
+                <Activity size={28} className="opacity-40" />
+                <p className="text-sm font-semibold text-text-primary">No health activity recorded</p>
+                <p className="text-xs">Logged biometrics, doses, and symptoms will populate this timeline.</p>
               </div>
             </div>
           </div>
@@ -217,64 +234,22 @@ export default function ProviderPatientDetailPage({ params }: Props) {
 
         {/* Medications tab */}
         {tab === "medications" && (
-          <div className="space-y-4">
-            {/* Adherence summary */}
-            <div className="bg-bg-card rounded-xl shadow-card p-5">
-              <h3 className="font-semibold text-title-md text-text-primary mb-4">Adherence Breakdown</h3>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-                {todayMedications.map((med) => {
-                  const c = conditionColors[med.conditionId];
-                  const taken = med.status === "taken";
-                  return (
-                    <div key={med.id} className="p-3 rounded-lg border border-divider">
-                      <p className="font-semibold text-xs text-text-primary truncate">{med.name}</p>
-                      <p className="text-xs text-text-tertiary">{med.dosage}</p>
-                      <div className="flex items-center gap-1 mt-2">
-                        {taken
-                          ? <CheckCircle2 size={13} style={{ color: "#00B894" }} aria-label="Taken" />
-                          : <Clock size={13} style={{ color: "#A29BFE" }} aria-label="Pending" />
-                        }
-                        <span className="text-xs font-semibold capitalize" style={{ color: taken ? "#00B894" : "#A29BFE" }}>
-                          {med.status}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-label-sm text-text-secondary">Today: {takenCount}/{todayMedications.length} taken</span>
-                <span className="text-label-sm font-semibold" style={{ color: weeklyAdherence >= 80 ? "#00B894" : "#F39C12" }}>
-                  7-day: {weeklyAdherence}%
-                </span>
-              </div>
-            </div>
+          <div className="bg-bg-card rounded-xl shadow-card p-12 text-center flex flex-col items-center justify-center gap-2 text-text-tertiary">
+            <Pill size={28} className="opacity-40" />
+            <p className="text-sm font-semibold text-text-primary">No active prescriptions</p>
+            <p className="text-xs">This patient does not have active medications configured in their protocol.</p>
           </div>
         )}
 
         {/* Labs tab */}
         {tab === "labs" && (
-          <div className="bg-bg-card rounded-xl shadow-card overflow-hidden">
-            <div className="px-4 py-3 border-b border-divider">
-              <h3 className="font-semibold text-title-md text-text-primary">Lab Results</h3>
-              <p className="text-xs text-text-tertiary mt-0.5">Manual entries · Last 6 months</p>
-            </div>
-            {LAB_RESULTS.map((lab, i) => (
-              <div key={lab.name} className={clsx("flex items-center gap-4 px-4 py-3", i < LAB_RESULTS.length - 1 && "border-b border-divider")}>
-                <div className="flex-1">
-                  <p className="font-semibold text-label-sm text-text-primary">{lab.name}</p>
-                  <p className="text-xs text-text-tertiary">{lab.ref} · {lab.date}</p>
-                </div>
-                <div className="text-right">
-                  <p className="font-bold metric-value text-label-sm" style={{ color: STATUS_COLORS[lab.status] }}>{lab.value}</p>
-                  <p className="text-xs" style={{ color: lab.trend === "down" ? "#00B894" : lab.trend === "up" ? "#D63031" : "#8888A8" }}>
-                    {lab.trend === "down" ? "↓ Improving" : lab.trend === "up" ? "↑ Worsening" : "→ Stable"}
-                  </p>
-                </div>
-              </div>
-            ))}
+          <div className="bg-bg-card rounded-xl shadow-card p-12 text-center flex flex-col items-center justify-center gap-2 text-text-tertiary">
+            <FileText size={28} className="opacity-40" />
+            <p className="text-sm font-semibold text-text-primary">No laboratory results</p>
+            <p className="text-xs">No laboratory test panels have been uploaded for this patient.</p>
           </div>
         )}
+
 
         {/* Symptoms tab */}
         {tab === "symptoms" && (

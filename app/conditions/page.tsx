@@ -3,12 +3,12 @@
 import React, { useState, useEffect } from "react";
 import AppShell from "@/components/layout/AppShell";
 import ConditionTile from "@/components/patient/ConditionTile";
-import { getMockDashboardData } from "@/lib/mock-data";
 import { conditionColors } from "@/lib/design-tokens";
 import type { ConditionId, ConditionSummary } from "@/types";
 import Link from "next/link";
 import { Plus, TrendingDown, TrendingUp, Minus, ChevronRight, Activity, Search, X, Check } from "lucide-react";
 import { clsx } from "clsx";
+import { useAuth } from "@/context/AuthContext";
 
 // Full condition list the patient might add
 const ALL_AVAILABLE: ConditionId[] = [
@@ -21,16 +21,16 @@ const CONDITION_DETAILS: Record<string, {
   lastUpdated: string;
   weekTrend: "up" | "down" | "stable";
 }> = {
-  diabetes_t2:   { description: "Blood sugar management & insulin resistance", keyMetric: "142 mg/dL", lastUpdated: "8 min ago", weekTrend: "down" },
-  hypertension:  { description: "Blood pressure control & cardiovascular risk", keyMetric: "138/88 mmHg", lastUpdated: "8 min ago", weekTrend: "stable" },
-  ckd:           { description: "Kidney filtration rate & toxin clearance", keyMetric: "eGFR 48", lastUpdated: "Apr 10", weekTrend: "stable" },
-  copd:          { description: "Airflow obstruction & lung function", keyMetric: "FEV1 68%", lastUpdated: "Yesterday", weekTrend: "stable" },
-  chf:           { description: "Cardiac output & fluid management", keyMetric: "BP 130/80", lastUpdated: "2 hr ago", weekTrend: "stable" },
-  cad:           { description: "Coronary perfusion & cardiac events", keyMetric: "BP 130/80", lastUpdated: "2 hr ago", weekTrend: "stable" },
-  hypothyroidism:{ description: "Thyroid hormone levels & metabolism", keyMetric: "TSH 4.2", lastUpdated: "Mar 28", weekTrend: "stable" },
-  ra:            { description: "Joint inflammation & autoimmune activity", keyMetric: "DAS28: 3.4", lastUpdated: "Apr 1", weekTrend: "down" },
-  asthma:        { description: "Airway inflammation & bronchospasm", keyMetric: "Control 22/25", lastUpdated: "Yesterday", weekTrend: "stable" },
-  diabetes_t1:   { description: "Insulin-dependent glucose management", keyMetric: "142 mg/dL", lastUpdated: "8 min ago", weekTrend: "down" },
+  diabetes_t2:   { description: "Blood sugar management & insulin resistance", keyMetric: "--", lastUpdated: "No readings logged", weekTrend: "stable" },
+  hypertension:  { description: "Blood pressure control & cardiovascular risk", keyMetric: "--", lastUpdated: "No readings logged", weekTrend: "stable" },
+  ckd:           { description: "Kidney filtration rate & toxin clearance", keyMetric: "--", lastUpdated: "No readings logged", weekTrend: "stable" },
+  copd:          { description: "Airflow obstruction & lung function", keyMetric: "--", lastUpdated: "No readings logged", weekTrend: "stable" },
+  chf:           { description: "Cardiac output & fluid management", keyMetric: "--", lastUpdated: "No readings logged", weekTrend: "stable" },
+  cad:           { description: "Coronary perfusion & cardiac events", keyMetric: "--", lastUpdated: "No readings logged", weekTrend: "stable" },
+  hypothyroidism:{ description: "Thyroid hormone levels & metabolism", keyMetric: "--", lastUpdated: "No readings logged", weekTrend: "stable" },
+  ra:            { description: "Joint inflammation & autoimmune activity", keyMetric: "--", lastUpdated: "No readings logged", weekTrend: "stable" },
+  asthma:        { description: "Airway inflammation & bronchospasm", keyMetric: "--", lastUpdated: "No readings logged", weekTrend: "stable" },
+  diabetes_t1:   { description: "Insulin-dependent glucose management", keyMetric: "--", lastUpdated: "No readings logged", weekTrend: "stable" },
 };
 
 const METRIC_METADATA: Record<ConditionId, {
@@ -39,49 +39,46 @@ const METRIC_METADATA: Record<ConditionId, {
   status: "green" | "amber" | "red";
   trend: "up" | "down" | "stable";
 }> = {
-  diabetes_t2:    { metricLabel: "Blood Glucose",  unit: "mg/dL",  status: "amber", trend: "down" },
-  diabetes_t1:    { metricLabel: "Blood Glucose",  unit: "mg/dL",  status: "amber", trend: "down" },
-  hypertension:   { metricLabel: "Blood Pressure", unit: "mmHg",   status: "amber", trend: "stable" },
-  ckd:            { metricLabel: "eGFR",           unit: "mL/min", status: "amber", trend: "stable" },
+  diabetes_t2:    { metricLabel: "Blood Glucose",  unit: "mg/dL",  status: "green", trend: "stable" },
+  diabetes_t1:    { metricLabel: "Blood Glucose",  unit: "mg/dL",  status: "green", trend: "stable" },
+  hypertension:   { metricLabel: "Blood Pressure", unit: "mmHg",   status: "green", trend: "stable" },
+  ckd:            { metricLabel: "eGFR",           unit: "mL/min", status: "green", trend: "stable" },
   copd:           { metricLabel: "FEV1",           unit: "%",      status: "green", trend: "stable" },
   chf:            { metricLabel: "Blood Pressure", unit: "mmHg",   status: "green", trend: "stable" },
   cad:            { metricLabel: "Blood Pressure", unit: "mmHg",   status: "green", trend: "stable" },
   hypothyroidism: { metricLabel: "TSH",            unit: "mIU/L",  status: "green", trend: "stable" },
-  ra:             { metricLabel: "DAS28 Score",    unit: "",       status: "green", trend: "down" },
+  ra:             { metricLabel: "DAS28 Score",    unit: "",       status: "green", trend: "stable" },
   asthma:         { metricLabel: "Control Score",  unit: "/25",    status: "green", trend: "stable" },
 };
 
 const METRIC_VALUES: Record<ConditionId, string> = {
-  diabetes_t2: "142",
-  diabetes_t1: "142",
-  hypertension: "138/88",
-  ckd: "48",
-  copd: "68",
-  chf: "130/80",
-  cad: "130/80",
-  hypothyroidism: "4.2",
-  ra: "3.4",
-  asthma: "22",
+  diabetes_t2: "--",
+  diabetes_t1: "--",
+  hypertension: "--",
+  ckd: "--",
+  copd: "--",
+  chf: "--",
+  cad: "--",
+  hypothyroidism: "--",
+  ra: "--",
+  asthma: "--",
 };
 
 export default function ConditionsPage() {
-  const { patient } = getMockDashboardData();
+  const { profile } = useAuth();
   const [myConditionIds, setMyConditionIds] = useState<ConditionId[]>([]);
   const [tab, setTab] = useState<"mine" | "all">("mine");
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Hydrate from localStorage on client-side to prevent Next.js mismatch
+  // Hydrate strictly from authenticated profile conditions
   useEffect(() => {
-    const saved = localStorage.getItem("tracked_conditions");
-    if (saved) {
-      setMyConditionIds(JSON.parse(saved));
+    if (profile?.conditions && Array.isArray(profile.conditions)) {
+      setMyConditionIds(profile.conditions as ConditionId[]);
     } else {
-      const initial = patient.conditions;
-      setMyConditionIds(initial);
-      localStorage.setItem("tracked_conditions", JSON.stringify(initial));
+      setMyConditionIds([]);
     }
-  }, []);
+  }, [profile]);
 
   const addCondition = (id: ConditionId) => {
     if (!myConditionIds.includes(id)) {
@@ -154,74 +151,97 @@ export default function ConditionsPage() {
 
         {/* My conditions tab */}
         {tab === "mine" && (
-          <div className="space-y-3">
-            {/* Quick tiles grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
-              {conditionSummaries.map((s) => (
-                <Link href={`/conditions/${s.conditionId}`} key={s.conditionId} className="block hover:scale-[1.01] transition-transform">
-                  <ConditionTile summary={s} />
-                </Link>
-              ))}
-            </div>
-
-            {/* Detail cards */}
-            {myConditionIds.map((cId) => {
-              const c = conditionColors[cId];
-              const detail = CONDITION_DETAILS[cId];
-              if (!c || !detail) return null;
-              const Icon = TrendIcon(detail.weekTrend);
-              const trendColor = detail.weekTrend === "down" ? "#00B894" : detail.weekTrend === "up" ? "#D63031" : "#8888A8";
-              return (
-                <Link
-                  key={cId}
-                  href={`/conditions/${cId}`}
-                  className="block bg-bg-card rounded-xl shadow-card p-4 card-enter hover:shadow-card-hover transition-all group"
+          <div className="space-y-4">
+            {myConditionIds.length === 0 ? (
+              <div className="bg-bg-card border border-divider rounded-2xl p-10 shadow-card text-center space-y-4 animate-fade-in">
+                <div className="w-14 h-14 rounded-2xl bg-bg-lavender text-accent-violet flex items-center justify-center mx-auto shadow-xs">
+                  <Activity size={28} />
+                </div>
+                <div className="max-w-md mx-auto">
+                  <h3 className="font-bold text-title-md text-text-primary">No Chronic Conditions Tracked</h3>
+                  <p className="text-body-md text-text-secondary mt-1.5 leading-relaxed">
+                    Select your diagnosed chronic conditions to activate tailored vital tracking, clinical alerts, and personalized medication management.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setAddModalOpen(true)}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl gradient-violet text-white text-label-sm font-semibold shadow-card hover:opacity-95 transition-opacity"
                 >
-                  <div className="flex items-start gap-4">
-                    {/* Icon */}
-                    <div className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl flex-shrink-0"
-                      style={{ background: c.bg }}>
-                      {c.emoji}
-                    </div>
+                  <Plus size={16} />
+                  <span>Log a Condition</span>
+                </button>
+              </div>
+            ) : (
+              <>
+                {/* Quick tiles grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
+                  {conditionSummaries.map((s) => (
+                    <Link href={`/conditions/${s.conditionId}`} key={s.conditionId} className="block hover:scale-[1.01] transition-transform">
+                      <ConditionTile summary={s} />
+                    </Link>
+                  ))}
+                </div>
 
-                    {/* Info */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <h3 className="font-semibold text-title-md text-text-primary group-hover:text-accent-violet transition-colors">
-                            {c.label}
-                          </h3>
-                          <p className="text-xs text-text-secondary mt-0.5 leading-snug">{detail.description}</p>
+                {/* Detail cards */}
+                {myConditionIds.map((cId) => {
+                  const c = conditionColors[cId];
+                  const detail = CONDITION_DETAILS[cId];
+                  if (!c || !detail) return null;
+                  const Icon = TrendIcon(detail.weekTrend);
+                  const trendColor = detail.weekTrend === "down" ? "#00B894" : detail.weekTrend === "up" ? "#D63031" : "#8888A8";
+                  return (
+                    <Link
+                      key={cId}
+                      href={`/conditions/${cId}`}
+                      className="block bg-bg-card rounded-xl shadow-card p-4 card-enter hover:shadow-card-hover transition-all group"
+                    >
+                      <div className="flex items-start gap-4">
+                        {/* Icon */}
+                        <div className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl flex-shrink-0"
+                          style={{ background: c.bg }}>
+                          {c.emoji}
                         </div>
-                        <ChevronRight size={16} className="text-text-tertiary group-hover:text-accent-violet transition-colors flex-shrink-0 mt-0.5" />
-                      </div>
 
-                      <div className="flex items-center gap-4 mt-3">
-                        {/* Key metric */}
-                        <div>
-                          <p className="text-xs text-text-tertiary mb-0.5">Latest</p>
-                          <p className="font-bold metric-value text-text-primary" style={{ color: c.accent, fontSize: "15px" }}>
-                            {detail.keyMetric}
-                          </p>
-                        </div>
-                        {/* Last updated */}
-                        <div>
-                          <p className="text-xs text-text-tertiary mb-0.5">Updated</p>
-                          <p className="text-label-sm text-text-secondary">{detail.lastUpdated}</p>
-                        </div>
-                        {/* Week trend */}
-                        <div className="ml-auto flex items-center gap-1">
-                          <Icon size={14} style={{ color: trendColor }} aria-hidden="true" />
-                          <span className="text-xs font-semibold capitalize" style={{ color: trendColor }}>
-                            {detail.weekTrend === "down" ? "Improving" : detail.weekTrend === "up" ? "Worsening" : "Stable"}
-                          </span>
+                        {/* Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <h3 className="font-semibold text-title-md text-text-primary group-hover:text-accent-violet transition-colors">
+                                {c.label}
+                              </h3>
+                              <p className="text-xs text-text-secondary mt-0.5 leading-snug">{detail.description}</p>
+                            </div>
+                            <ChevronRight size={16} className="text-text-tertiary group-hover:text-accent-violet transition-colors flex-shrink-0 mt-0.5" />
+                          </div>
+
+                          <div className="flex items-center gap-4 mt-3">
+                            {/* Key metric */}
+                            <div>
+                              <p className="text-xs text-text-tertiary mb-0.5">Latest</p>
+                              <p className="font-bold metric-value text-text-primary" style={{ color: c.accent, fontSize: "15px" }}>
+                                {detail.keyMetric}
+                              </p>
+                            </div>
+                            {/* Last updated */}
+                            <div>
+                              <p className="text-xs text-text-tertiary mb-0.5">Updated</p>
+                              <p className="text-label-sm text-text-secondary">{detail.lastUpdated}</p>
+                            </div>
+                            {/* Week trend */}
+                            <div className="ml-auto flex items-center gap-1">
+                              <Icon size={14} style={{ color: trendColor }} aria-hidden="true" />
+                              <span className="text-xs font-semibold capitalize" style={{ color: trendColor }}>
+                                {detail.weekTrend === "down" ? "Improving" : detail.weekTrend === "up" ? "Worsening" : "Stable"}
+                              </span>
+                            </div>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </div>
-                </Link>
-              );
-            })}
+                    </Link>
+                  );
+                })}
+              </>
+            )}
           </div>
         )}
 

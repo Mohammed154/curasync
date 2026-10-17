@@ -8,7 +8,7 @@ import { z } from "zod";
 import { nanoid } from "nanoid";
 import { getPatientAuth, isNextResponse } from "@/lib/auth";
 import { checkRateLimit, aiLimiter } from "@/lib/ratelimit";
-import { db, patientProfiles, readings, medications } from "@/lib/db";
+import { db, profiles, vitals, patientProfiles, readings, medications } from "@/lib/db";
 import { eq, desc } from "drizzle-orm";
 
 const MessageSchema = z.object({
@@ -22,28 +22,52 @@ const RequestSchema = z.object({
 
 // Build patient context from real DB data
 async function buildPatientContext(patientId: string): Promise<string> {
-  const patId = patientId as `${string}-${string}-${string}-${string}-${string}`;
-
   try {
-    const [patient, latestReadings, activeMeds] = await Promise.all([
-      db.select().from(patientProfiles).where(eq(patientProfiles.id, patId)).limit(1),
-      db.select().from(readings).where(eq(readings.patientId, patId)).orderBy(desc(readings.recordedAt)).limit(10),
-      db.select().from(medications).where(eq(medications.patientId, patId)).limit(20),
-    ]);
+    // 1. Try public.profiles and public.vitals (Firebase UID)
+    const [userProfile] = await db.select().from(profiles).where(eq(profiles.id, patientId)).limit(1);
+    if (userProfile) {
+      const userVitals = await db
+        .select()
+        .from(vitals)
+        .where(eq(vitals.userId, patientId))
+        .orderBy(desc(vitals.recordedAt))
+        .limit(10);
 
-    const p = patient[0];
-    if (!p) return "Patient data unavailable.";
+      const vitalsSummary = userVitals
+        .map((v) => `${v.type}: ${v.value} ${v.unit} (${new Date(v.recordedAt).toLocaleDateString()})`)
+        .join(", ");
 
-    const age = new Date().getFullYear() - new Date(p.dateOfBirth ?? "1970").getFullYear();
-    const readingSummary = latestReadings
-      .map((r) => `${r.type}: ${r.value} ${r.unit} (${new Date(r.recordedAt).toLocaleDateString()})`)
-      .join(", ");
-    const medSummary = activeMeds.map((m) => `${m.name} ${m.dosage} ${m.frequency}`).join(", ");
+      return `Patient: ${userProfile.displayName || "Patient"}.
+Conditions: ${userProfile.conditions?.join(", ") || "None specified"}.
+Recent vitals: ${vitalsSummary || "none logged"}.`;
+    }
 
-    return `Patient: ${p.name}, Age: ${age}.
+    // 2. Legacy fallback if UUID
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(patientId);
+    if (isUuid) {
+      const patId = patientId as `${string}-${string}-${string}-${string}-${string}`;
+      const [patient, latestReadings, activeMeds] = await Promise.all([
+        db.select().from(patientProfiles).where(eq(patientProfiles.id, patId)).limit(1),
+        db.select().from(readings).where(eq(readings.patientId, patId)).orderBy(desc(readings.recordedAt)).limit(10),
+        db.select().from(medications).where(eq(medications.patientId, patId)).limit(20),
+      ]);
+
+      const p = patient[0];
+      if (p) {
+        const age = new Date().getFullYear() - new Date(p.dateOfBirth ?? "1970").getFullYear();
+        const readingSummary = latestReadings
+          .map((r) => `${r.type}: ${r.value} ${r.unit} (${new Date(r.recordedAt).toLocaleDateString()})`)
+          .join(", ");
+        const medSummary = activeMeds.map((m) => `${m.name} ${m.dosage} ${m.frequency}`).join(", ");
+
+        return `Patient: ${p.name}, Age: ${age}.
 Conditions: ${p.conditions.join(", ")}.
 Recent readings: ${readingSummary || "none logged"}.
 Medications: ${medSummary || "none recorded"}.`;
+      }
+    }
+
+    return "Patient data unavailable.";
   } catch (error) {
     console.error("[ai] Database query failed when building patient context:", error);
     return "Patient context is temporarily unavailable (offline mode).";

@@ -6,13 +6,13 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard, Stethoscope, Pill, BookOpen, Bell,
   Settings, LogOut, Menu, X, Heart, ChevronDown, MapPin,
-  MessageSquare, CalendarDays, Watch, UserPlus, Droplets,
+  MessageSquare, CalendarDays, UserPlus, Droplets,
   Check, CheckCheck, Video, FlaskConical
 } from "lucide-react";
 import { clsx } from "clsx";
 import { severityBg, severityColor, severityIcon } from "@/lib/alerts";
-import { getMockDashboardData } from "@/lib/mock-data";
 import type { Alert } from "@/types";
+import { useAuth } from "@/context/AuthContext";
 
 interface NavItem {
   label: string;
@@ -29,7 +29,6 @@ const PATIENT_NAV: NavItem[] = [
   { label: "Medications",      href: "/medications",      icon: Pill },
   { label: "Journal",          href: "/journal",          icon: BookOpen },
   { label: "Calendar",         href: "/calendar",         icon: CalendarDays },
-  { label: "Wearables",        href: "/wearables",        icon: Watch },
   { label: "Messages",         href: "/messages",         icon: MessageSquare },
   { label: "Alerts",           href: "/alerts",           icon: Bell },
 ];
@@ -53,15 +52,15 @@ export function SafeSignOutButton({
   onClick,
   className
 }: SafeSignOutButtonProps) {
-  const router = useRouter();
+  const { signOut } = useAuth();
 
-  const handleDemoSignOut = () => {
+  const handleSignOut = async () => {
     if (onClick) onClick();
-    router.push("/");
+    await signOut();
   };
 
   return (
-    <button onClick={handleDemoSignOut} className={className}>
+    <button onClick={handleSignOut} className={className}>
       {children}
     </button>
   );
@@ -85,10 +84,30 @@ export default function AppShell({
   const [sidebarProfileOpen, setSidebarProfileOpen] = useState(false);
   const [notifications, setNotifications] = useState<Alert[]>([]);
 
+  const { user, profile } = useAuth();
+  const displayName = user?.displayName || profile?.display_name || (role === "provider" ? "Dr. Priya Sharma" : "Patient");
+  const userEmail = user?.email || profile?.email || (role === "provider" ? "dr.priya@curasync.care" : "patient@curasync.care");
+  const initials = displayName
+    .split(" ")
+    .filter(Boolean)
+    .map((n: string) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2) || (role === "provider" ? "DR" : "PT");
+
   useEffect(() => {
-    // Load alerts from mock data
-    const data = getMockDashboardData();
-    setNotifications(data.activeAlerts);
+    fetch("/api/v1/alerts?status=active")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json) => {
+        if (json?.data && Array.isArray(json.data)) {
+          setNotifications(json.data);
+        } else {
+          setNotifications([]);
+        }
+      })
+      .catch(() => {
+        setNotifications([]);
+      });
   }, []);
 
   const activeCount = notifications.filter((n) => n.status === "active").length;
@@ -190,14 +209,14 @@ export default function AppShell({
             <div
               className="w-9 h-9 rounded-full gradient-violet flex items-center justify-center text-white font-semibold text-label-sm flex-shrink-0 shadow-sm"
             >
-              AM
+              {initials}
             </div>
             <div className="min-w-0 flex-1">
               <p className="font-semibold text-label-sm text-text-primary truncate">
-                Arjun Mehta
+                {displayName}
               </p>
               <p className="text-xs text-text-tertiary truncate capitalize">
-                {role} · Mumbai
+                {role} · {userEmail}
               </p>
             </div>
             <ChevronDown
@@ -216,8 +235,8 @@ export default function AppShell({
               style={{ boxShadow: "0 8px 24px rgba(108,92,231,0.12)" }}
             >
               <div className="px-2.5 py-2 border-b border-divider bg-bg-lavender/30 rounded-lg mb-1.5">
-                <p className="text-xs font-bold text-text-primary">Arjun Mehta</p>
-                <p className="text-[11px] text-text-tertiary truncate">arjun.mehta@outlook.com</p>
+                <p className="text-xs font-bold text-text-primary">{displayName}</p>
+                <p className="text-[11px] text-text-tertiary truncate">{userEmail}</p>
                 <span className="text-[10px] font-bold text-accent-violet uppercase bg-bg-lavender/60 px-2 py-0.5 rounded-full mt-1.5 inline-block">
                   {role}
                 </span>
@@ -245,18 +264,6 @@ export default function AppShell({
               >
                 <Heart size={15} className="text-text-tertiary" />
                 <span>My Conditions</span>
-              </Link>
-
-              <Link
-                href="/wearables"
-                onClick={() => {
-                  setSidebarProfileOpen(false);
-                  setSidebarOpen(false);
-                }}
-                className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-text-secondary hover:bg-bg-lavender hover:text-text-primary transition-all text-xs font-medium"
-              >
-                <Watch size={15} className="text-text-tertiary" />
-                <span>Connected Devices</span>
               </Link>
 
               <div className="border-t border-divider pt-1 mt-1">
@@ -531,11 +538,11 @@ export default function AppShell({
                   >
                     <div className="p-4 border-b border-divider flex items-center gap-3 bg-bg-lavender/25">
                       <div className="w-10 h-10 rounded-full gradient-violet flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-                        AM
+                        {initials}
                       </div>
                       <div className="min-w-0">
-                        <p className="font-semibold text-label-sm text-text-primary truncate">Arjun Mehta</p>
-                        <p className="text-[11px] text-text-tertiary truncate">arjun.mehta@outlook.com</p>
+                        <p className="font-semibold text-label-sm text-text-primary truncate">{displayName}</p>
+                        <p className="text-[11px] text-text-tertiary truncate">{userEmail}</p>
                         <span className="text-[10px] font-bold text-accent-violet uppercase bg-bg-lavender/50 px-2 py-0.5 rounded-full mt-1 inline-block">
                           {role}
                         </span>
@@ -558,14 +565,6 @@ export default function AppShell({
                       >
                         <Heart size={15} className="text-text-tertiary" />
                         My Conditions
-                      </Link>
-                      <Link
-                        href="/wearables"
-                        onClick={closeProfile}
-                        className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-text-secondary hover:bg-bg-lavender hover:text-text-primary transition-all text-xs font-medium"
-                      >
-                        <Watch size={15} className="text-text-tertiary" />
-                        Wearables
                       </Link>
                     </div>
 

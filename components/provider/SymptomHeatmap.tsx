@@ -13,18 +13,15 @@ interface SymptomFrequency {
   avgSeverity: number; // 1–10
 }
 
-const MOCK_SYMPTOM_FREQ: SymptomFrequency[] = [
-  { symptom: "Excessive thirst",    conditionId: "diabetes_t2",  count: 18, lastOccurred: "Today",    avgSeverity: 5 },
-  { symptom: "Blurred vision",      conditionId: "diabetes_t2",  count: 7,  lastOccurred: "3 days ago", avgSeverity: 4 },
-  { symptom: "Fatigue",             conditionId: "diabetes_t2",  count: 14, lastOccurred: "Yesterday", avgSeverity: 6 },
-  { symptom: "Headache",            conditionId: "hypertension", count: 9,  lastOccurred: "2 days ago", avgSeverity: 5 },
-  { symptom: "Dizziness",           conditionId: "hypertension", count: 11, lastOccurred: "Today",    avgSeverity: 4 },
-  { symptom: "Ankle swelling",      conditionId: "ckd",          count: 6,  lastOccurred: "4 days ago", avgSeverity: 5 },
-  { symptom: "Nausea",              conditionId: "ckd",          count: 4,  lastOccurred: "1 week ago", avgSeverity: 3 },
-  { symptom: "Tingling in feet",    conditionId: "diabetes_t2",  count: 8,  lastOccurred: "Yesterday", avgSeverity: 3 },
-];
+import { BookOpen } from "lucide-react";
 
-const MAX_COUNT = Math.max(...MOCK_SYMPTOM_FREQ.map((s) => s.count));
+interface SymptomFrequency {
+  symptom: string;
+  conditionId: ConditionId;
+  count: number; // occurrences in last 30 days
+  lastOccurred: string;
+  avgSeverity: number; // 1–10
+}
 
 function severityColor(avg: number): string {
   if (avg >= 7) return "#D63031";
@@ -36,8 +33,20 @@ interface Props {
   symptoms?: SymptomFrequency[];
 }
 
-export default function SymptomHeatmap({ symptoms = MOCK_SYMPTOM_FREQ }: Props) {
+export default function SymptomHeatmap({ symptoms = [] }: Props) {
   const [filterCondition, setFilterCondition] = useState<ConditionId | "all">("all");
+
+  if (symptoms.length === 0) {
+    return (
+      <div className="bg-bg-card rounded-xl shadow-card p-12 text-center flex flex-col items-center justify-center gap-2 text-text-tertiary">
+        <BookOpen size={28} className="opacity-40" />
+        <p className="text-sm font-semibold text-text-primary">No symptoms logged</p>
+        <p className="text-xs">Patient journal entries and logged symptoms will build this clinical heatmap.</p>
+      </div>
+    );
+  }
+
+  const maxCount = Math.max(1, ...symptoms.map((s) => s.count));
 
   const conditions = [...new Set(symptoms.map((s) => s.conditionId))] as ConditionId[];
 
@@ -96,7 +105,7 @@ export default function SymptomHeatmap({ symptoms = MOCK_SYMPTOM_FREQ }: Props) 
         )}
         {sorted.map((s) => {
           const c = conditionColors[s.conditionId];
-          const barWidth = (s.count / MAX_COUNT) * 100;
+          const barWidth = (s.count / maxCount) * 100;
           const sColor = severityColor(s.avgSeverity);
 
           return (
@@ -126,7 +135,7 @@ export default function SymptomHeatmap({ symptoms = MOCK_SYMPTOM_FREQ }: Props) 
                     opacity: 0.85,
                   }}
                   aria-valuenow={s.count}
-                  aria-valuemax={MAX_COUNT}
+                  aria-valuemax={maxCount}
                   role="meter"
                   aria-label={`${s.symptom}: ${s.count} times`}
                 />

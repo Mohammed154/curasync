@@ -32,7 +32,6 @@ const ENV_SPECS: EnvSpec[] = [
   { key: "AWS_REGION",                         required: "optional",    description: "AWS region" },
   { key: "AWS_S3_BUCKET",                      required: "optional",    description: "S3 bucket for PDF reports" },
   { key: "GOOGLE_APPLICATION_CREDENTIALS_JSON",required: "optional",    description: "GCP Vision credentials (OCR)" },
-  { key: "WEBHOOK_SECRET",                     required: "optional",    description: "HMAC secret for wearable webhooks" },
 ];
 
 export function validateEnv(): void {

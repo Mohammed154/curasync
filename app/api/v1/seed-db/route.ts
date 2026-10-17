@@ -34,15 +34,15 @@ async function handleSeed() {
       ) VALUES (
         ${demoPatientId},
         'dev_user_001',
-        'Arjun Mehta',
+        'Demo Patient',
         '1965-04-12',
         ARRAY['diabetes_t2', 'hypertension', 'ckd']::condition_id[],
-        ${JSON.stringify({ name: "Ananya Mehta", phone: "+1 555-0192", relationship: "Spouse" })},
+        ${JSON.stringify({ name: "Emergency Contact", phone: "+1 555-0192", relationship: "Spouse" })},
         'en',
         true
       )
       ON CONFLICT (id) DO UPDATE SET
-        name = 'Arjun Mehta',
+        name = 'Demo Patient',
         user_id = 'dev_user_001',
         date_of_birth = '1965-04-12',
         conditions = ARRAY['diabetes_t2', 'hypertension', 'ckd']::condition_id[],

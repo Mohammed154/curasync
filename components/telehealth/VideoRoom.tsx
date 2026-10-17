@@ -4,13 +4,14 @@ import React, { useState, useEffect, useRef } from "react";
 import {
   Mic, MicOff, Video, VideoOff, PhoneOff, Users, Shield, MessageSquare,
   Share2, Activity, Settings, Maximize2, Minimize2, CheckCircle2,
-  Volume2, Stethoscope, ChevronRight, Send, AlertTriangle, X
+  Volume2, Stethoscope, ChevronRight, Send, AlertTriangle, X, ShieldAlert
 } from "lucide-react";
 import { clsx } from "clsx";
 
 interface VideoRoomProps {
   roomUrl?: string;
   roomName: string;
+  token?: string;
   patientName?: string;
   providerName?: string;
   onLeave: () => void;
@@ -26,10 +27,35 @@ interface InCallMessage {
 export default function VideoRoom({
   roomUrl,
   roomName,
-  patientName = "Arjun Mehta",
+  token,
+  patientName = "Patient",
   providerName = "Dr. Priya Sharma",
   onLeave,
 }: VideoRoomProps) {
+  if (!token) {
+    return (
+      <div className="fixed inset-0 z-50 bg-[#0F172A] flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-[#1E293B] rounded-2xl p-6 border border-red-500/30 text-center space-y-4 shadow-2xl">
+          <div className="w-14 h-14 rounded-2xl bg-red-500/10 text-red-400 flex items-center justify-center mx-auto">
+            <ShieldAlert size={28} />
+          </div>
+          <div>
+            <h2 className="text-white font-bold text-lg">Session Authorization Required</h2>
+            <p className="text-slate-400 text-xs mt-1.5 leading-relaxed">
+              Direct access to video consultation rooms is restricted. You must have an authorized session token issued via a verified doctor connection.
+            </p>
+          </div>
+          <button
+            onClick={onLeave}
+            className="w-full py-2.5 rounded-xl gradient-violet text-white text-xs font-semibold shadow-card hover:opacity-95"
+          >
+            Return to Telehealth Hub
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   // Media states
   const [micOn, setMicOn] = useState(true);
   const [cameraOn, setCameraOn] = useState(true);

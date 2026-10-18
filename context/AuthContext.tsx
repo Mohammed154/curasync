@@ -29,13 +29,18 @@ export interface UserProfile {
   location_updated_at?: string | null;
 }
 
+export interface SignInResult {
+  user: User;
+  profile: UserProfile | null;
+}
+
 interface AuthContextType {
   user: User | null;
   profile: UserProfile | null;
   loading: boolean;
   turnstileToken: string | null;
   setTurnstileToken: (token: string | null) => void;
-  signInWithGoogle: (turnstile?: string) => Promise<User | null>;
+  signInWithGoogle: (turnstile?: string) => Promise<SignInResult | null>;
   signInWithRedirectFlow: () => Promise<void>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -61,7 +66,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
 
-  const syncUserToSupabase = useCallback(async (firebaseUser: User, turnstile?: string, locationCoords?: { latitude: number; longitude: number; accuracy?: number }) => {
+  const syncUserToSupabase = useCallback(async (firebaseUser: User, turnstile?: string, locationCoords?: { latitude: number; longitude: number; accuracy?: number }): Promise<UserProfile | null> => {
     try {
       const idToken = await firebaseUser.getIdToken();
       let cachedLoc: { latitude: number; longitude: number; accuracy?: number } | null = locationCoords || null;
@@ -79,7 +84,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           idToken,
-          turnstileToken: turnstile || "test_turnstile_token",
+          turnstileToken: turnstile || undefined,
           location: cachedLoc ? {
             latitude: cachedLoc.latitude,
             longitude: cachedLoc.longitude,
@@ -93,11 +98,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const json = await res.json();
         if (json.profile) {
           setProfile(json.profile);
+          return json.profile;
         }
+      } else {
+        const errJson = await res.json().catch(() => ({}));
+        console.warn("[auth-context] Sync error status:", res.status, errJson);
       }
     } catch (err) {
       console.error("[auth-context] User sync error:", err);
     }
+    return null;
   }, []);
 
   const updateLocation = useCallback(async (coords?: { latitude: number; longitude: number; accuracy?: number }) => {
@@ -154,7 +164,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .then(async (redirectUser) => {
         if (redirectUser) {
           setUser(redirectUser);
-          await syncUserToSupabase(redirectUser);
+          const syncedProfile = await syncUserToSupabase(redirectUser);
+          if (typeof window !== "undefined" && window.location.pathname === "/login") {
+            const hasCompleted = Boolean(
+              syncedProfile?.onboarding_complete ||
+              (Array.isArray(syncedProfile?.conditions) && syncedProfile.conditions.length > 0)
+            );
+            window.location.href = hasCompleted ? "/dashboard" : "/onboarding";
+          }
         }
       })
       .catch((err) => {
@@ -177,13 +194,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [syncUserToSupabase]);
 
-  const signInWithGoogle = async (turnstile?: string): Promise<User | null> => {
+  const signInWithGoogle = async (turnstile?: string): Promise<SignInResult | null> => {
     setLoading(true);
     try {
       const signedInUser = await signInWithGooglePopup();
       setUser(signedInUser);
-      await syncUserToSupabase(signedInUser, turnstile || turnstileToken || undefined);
-      return signedInUser;
+      const syncedProfile = await syncUserToSupabase(signedInUser, turnstile || turnstileToken || undefined);
+      return {
+        user: signedInUser,
+        profile: syncedProfile,
+      };
     } catch (err) {
       console.error("[auth-context] Google popup error:", err);
       throw err;

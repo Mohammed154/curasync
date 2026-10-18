@@ -8,6 +8,7 @@ import { getPatientAuth, isNextResponse } from "@/lib/auth";
 import { db, patientProfiles } from "@/lib/db";
 import { eq } from "drizzle-orm";
 import { writeAuditLog, getRequestMeta } from "@/lib/audit";
+import { getSupabaseAdminClient } from "@/lib/supabase";
 
 const ConditionIdEnum = z.enum([
   "diabetes_t2","diabetes_t1","hypertension","ckd","copd",
@@ -81,6 +82,27 @@ export async function POST(request: NextRequest) {
         })
         .returning();
       profile = inserted;
+    }
+
+    // Also update Supabase public.profiles so onboarding_complete is permanently true
+    try {
+      const supabase = getSupabaseAdminClient();
+      await supabase
+        .from("profiles")
+        .upsert(
+          {
+            id: authCtx.userId,
+            display_name: name,
+            date_of_birth: dateOfBirth,
+            conditions: conditions,
+            emergency_contact: emergencyContact ?? null,
+            onboarding_complete: true,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "id" }
+        );
+    } catch (supaErr) {
+      console.warn("[onboarding] public.profiles sync warning:", supaErr);
     }
   } catch (dbErr: any) {
     console.error("[onboarding] POST database error:", dbErr);

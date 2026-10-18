@@ -13,19 +13,29 @@ export default function LoginPage() {
   const [authError, setAuthError] = useState<string | null>(null);
   const [isSigningIn, setIsSigningIn] = useState(false);
 
+  const resolveTarget = (prof?: typeof profile) => {
+    const hasCompleted = Boolean(
+      prof?.onboarding_complete ||
+      (Array.isArray(prof?.conditions) && prof.conditions.length > 0)
+    );
+    return hasCompleted ? "/dashboard" : "/onboarding";
+  };
+
   useEffect(() => {
-    if (!loading && user && profile) {
-      router.replace("/dashboard");
+    if (!loading && user) {
+      const destination = resolveTarget(profile);
+      window.location.href = destination;
     }
-  }, [user, profile, loading, router]);
+  }, [user, profile, loading]);
 
   const handleGoogleSignIn = async () => {
     setAuthError(null);
     setIsSigningIn(true);
     try {
-      const signedIn = await signInWithGoogle(turnstileToken || undefined);
-      if (signedIn) {
-        router.push("/dashboard");
+      const result = await signInWithGoogle(turnstileToken || undefined);
+      if (result?.user) {
+        const destination = resolveTarget(result.profile);
+        window.location.href = destination;
       }
     } catch (err: any) {
       console.error("Sign in failed:", err);

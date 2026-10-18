@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { Heart, CheckCircle2, ArrowRight, Sparkles } from "lucide-react";
 import { clsx } from "clsx";
+import { useAuth } from "@/context/AuthContext";
 
 const CHECKLIST = [
   { label: "Conditions selected", done: true },
@@ -14,11 +15,13 @@ const CHECKLIST = [
 
 export default function OnboardingCompletePage() {
   const [visible, setVisible] = useState(false);
+  const { refreshProfile } = useAuth();
 
   useEffect(() => {
     const t = setTimeout(() => setVisible(true), 100);
+    refreshProfile().catch(() => {});
     return () => clearTimeout(t);
-  }, []);
+  }, [refreshProfile]);
 
   return (
     <div className="min-h-screen gradient-dark flex flex-col items-center justify-center px-4 py-10">

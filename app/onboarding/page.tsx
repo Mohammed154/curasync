@@ -39,7 +39,11 @@ export default function OnboardingPage() {
     setGoogleLoading(true);
     setError(null);
     try {
-      await signInWithGoogle(turnstileToken || undefined);
+      const result = await signInWithGoogle(turnstileToken || undefined);
+      if (result?.profile?.onboarding_complete || (Array.isArray(result?.profile?.conditions) && result.profile.conditions.length > 0)) {
+        window.location.href = "/dashboard";
+        return;
+      }
     } catch (err: any) {
       setError(err.message || "Google authentication failed");
     } finally {

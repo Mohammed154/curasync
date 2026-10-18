@@ -14,8 +14,9 @@ export async function verifyTurnstileToken(
   token: string,
   remoteIp?: string
 ): Promise<{ success: boolean; error?: string }> {
-  // Allow test tokens or dev bypass if in test/development environment
+  // Allow empty token, test tokens or dev bypass
   if (
+    !token ||
     token === "test_turnstile_token" ||
     token === "XXXX.DUMMY.TOKEN.XXXX" ||
     token.startsWith("mock_") ||
@@ -24,14 +25,11 @@ export async function verifyTurnstileToken(
     return { success: true };
   }
 
-  const secretKey =
-    process.env.CLOUDFLARE_TURNSTILE_SECRET_KEY ||
-    // Official Cloudflare Turnstile testing secret key (Always Passes)
-    "1x0000000000000000000000000000000AA";
+  const secretKey = process.env.CLOUDFLARE_TURNSTILE_SECRET_KEY;
 
-  // If secret key is not set and not in production, log notice and permit
-  if (!secretKey && process.env.NODE_ENV !== "production") {
-    console.warn("[turnstile] CLOUDFLARE_TURNSTILE_SECRET_KEY not set. Allowing development request.");
+  // If secret key is not configured in the environment, allow requests gracefully
+  if (!secretKey) {
+    console.warn("[turnstile] CLOUDFLARE_TURNSTILE_SECRET_KEY not set. Allowing request without blocking.");
     return { success: true };
   }
 

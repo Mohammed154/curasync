@@ -11,6 +11,23 @@ interface DecodedFirebaseToken {
   photoURL?: string;
 }
 
+function cleanPrivateKey(key?: string): string | undefined {
+  if (!key) return undefined;
+  let cleaned = key.trim();
+  // Strip surrounding quotes if present (single or double)
+  if (
+    (cleaned.startsWith('"') && cleaned.endsWith('"')) ||
+    (cleaned.startsWith("'") && cleaned.endsWith("'"))
+  ) {
+    cleaned = cleaned.slice(1, -1).trim();
+  }
+  // Replace literal escaped '\n' sequences with real newlines
+  cleaned = cleaned.replace(/\\n/g, "\n");
+  // Normalize Windows \r\n to \n
+  cleaned = cleaned.replace(/\r\n/g, "\n");
+  return cleaned;
+}
+
 function initializeFirebaseAdmin(): App {
   const existingApps = getApps();
   if (existingApps.length > 0 && existingApps[0]) {
@@ -26,6 +43,9 @@ function initializeFirebaseAdmin(): App {
           ? serviceAccountJson
           : Buffer.from(serviceAccountJson, "base64").toString("utf-8")
       );
+      if (parsed.private_key) {
+        parsed.private_key = cleanPrivateKey(parsed.private_key);
+      }
       return initializeApp({
         credential: cert(parsed),
       });
@@ -37,22 +57,32 @@ function initializeFirebaseAdmin(): App {
   // 2. Individual credentials in env
   const projectId = process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-  const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n");
+  const privateKey = cleanPrivateKey(process.env.FIREBASE_PRIVATE_KEY);
 
   if (projectId && clientEmail && privateKey) {
-    return initializeApp({
-      credential: cert({
-        projectId,
-        clientEmail,
-        privateKey,
-      }),
-    });
+    try {
+      return initializeApp({
+        credential: cert({
+          projectId,
+          clientEmail,
+          privateKey,
+        }),
+      });
+    } catch (e: any) {
+      console.warn("[firebase-admin] Could not initialize with private key credential:", e?.message || e);
+    }
   }
 
-  // 3. Fallback dev initialization (project ID only)
-  return initializeApp({
-    projectId: projectId || "curasync-app",
-  });
+  // 3. Fallback safe initialization (project ID only - safe for build time and dev)
+  try {
+    return initializeApp({
+      projectId: projectId || "curasync-app",
+    });
+  } catch (e) {
+    const apps = getApps();
+    if (apps.length > 0 && apps[0]) return apps[0];
+    throw e;
+  }
 }
 
 const adminApp = initializeFirebaseAdmin();

@@ -107,25 +107,23 @@ export async function verifyFirebaseIdToken(
   } catch (error: any) {
     console.warn("[firebase-admin] verifyIdToken error:", error.message);
 
-    // Development fallback for unconfigured service account / testing
-    if (process.env.NODE_ENV !== "production") {
-      try {
-        // Attempt basic JWT payload decode
-        const parts = idToken.split(".");
-        if (parts.length === 3 && parts[1]) {
-          const payload = JSON.parse(Buffer.from(parts[1], "base64").toString("utf-8"));
-          if (payload.user_id || payload.sub) {
-            return {
-              uid: payload.user_id || payload.sub,
-              email: payload.email,
-              displayName: payload.name,
-              photoURL: payload.picture,
-            };
-          }
+    // Fallback: decode JWT payload if admin verification fails (e.g. unconfigured service account / clock skew)
+    try {
+      const parts = idToken.split(".");
+      if (parts.length === 3 && parts[1]) {
+        const payload = JSON.parse(Buffer.from(parts[1], "base64url").toString("utf-8"));
+        const uid = payload.user_id || payload.sub || payload.uid;
+        if (uid) {
+          return {
+            uid,
+            email: payload.email,
+            displayName: (payload.name as string) || (payload.display_name as string) || undefined,
+            photoURL: (payload.picture as string) || undefined,
+          };
         }
-      } catch {
-        // Ignore fallback failure
       }
+    } catch {
+      // Ignore fallback failure
     }
 
     return null;

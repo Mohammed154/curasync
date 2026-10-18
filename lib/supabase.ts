@@ -5,21 +5,30 @@ import { createClient, SupabaseClient } from "@supabase/supabase-js";
 let _supabaseAdmin: SupabaseClient | null = null;
 let _supabaseBrowser: SupabaseClient | null = null;
 
-const SUPABASE_URL =
-  process.env.NEXT_PUBLIC_SUPABASE_URL || "https://qljcabrkkkcxyfmgiuey.supabase.co";
+function normalizeSupabaseUrl(raw?: string): string {
+  let url = (raw || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_SUPABASE_URL || "https://qljcabrkkkcxyfmgiuey.supabase.co").trim();
+  if (url.startsWith("db.")) {
+    url = url.slice(3);
+  }
+  if (!url.startsWith("http://") && !url.startsWith("https://")) {
+    url = `https://${url}`;
+  }
+  return url.replace(/\/$/, "");
+}
 
 /**
  * Server-side Supabase client with administrative privileges.
  * Prefers SUPABASE_SERVICE_ROLE_KEY; falls back to NEXT_PUBLIC_SUPABASE_ANON_KEY.
  */
 export function getSupabaseAdminClient(): SupabaseClient {
+  const url = normalizeSupabaseUrl();
   const key =
     process.env.SUPABASE_SERVICE_ROLE_KEY ||
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
     "";
 
   if (!_supabaseAdmin) {
-    _supabaseAdmin = createClient(SUPABASE_URL, key, {
+    _supabaseAdmin = createClient(url, key, {
       auth: {
         autoRefreshToken: false,
         persistSession: false,
@@ -33,10 +42,11 @@ export function getSupabaseAdminClient(): SupabaseClient {
  * Browser-safe Supabase client using public anon key.
  */
 export function getSupabaseBrowserClient(): SupabaseClient {
+  const url = normalizeSupabaseUrl();
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
 
   if (!_supabaseBrowser) {
-    _supabaseBrowser = createClient(SUPABASE_URL, key);
+    _supabaseBrowser = createClient(url, key);
   }
   return _supabaseBrowser;
 }

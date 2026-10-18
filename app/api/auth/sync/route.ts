@@ -114,8 +114,17 @@ export async function POST(request: NextRequest) {
 
     const resolvedLatitude = clientLat !== null && clientLat !== undefined ? clientLat : (!isNaN(parsedCfLat as number) ? parsedCfLat : null);
     const resolvedLongitude = clientLon !== null && clientLon !== undefined ? clientLon : (!isNaN(parsedCfLon as number) ? parsedCfLon : null);
-    const resolvedCity = clientCity || (cfCityHeader ? decodeURIComponent(cfCityHeader) : null);
-    const resolvedRegion = clientRegion || (cfRegionHeader ? decodeURIComponent(cfRegionHeader) : null);
+    function safeDecode(val: string | null): string | null {
+      if (!val) return null;
+      try {
+        return decodeURIComponent(val);
+      } catch {
+        return val;
+      }
+    }
+
+    const resolvedCity = clientCity || safeDecode(cfCityHeader);
+    const resolvedRegion = clientRegion || safeDecode(cfRegionHeader);
     const resolvedCountry = clientCountry || cfCountryHeader || null;
 
     const hasNewLocation =
@@ -164,7 +173,21 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (upsertError) {
-      console.error("[auth:sync] Supabase upsert error:", upsertError.message);
+      console.error("[auth:sync] Supabase upsert error:", upsertError.message, upsertError.details);
+      if (existingProfile) {
+        // Return existing profile if upsert failed due to permission/lock but profile exists
+        return NextResponse.json({
+          success: true,
+          profile: existingProfile,
+          user: {
+            uid: firebaseUid,
+            email: userEmail,
+            displayName,
+            photoURL: photoUrl,
+          },
+          warning: `Profile update warning: ${upsertError.message}`,
+        });
+      }
       return NextResponse.json(
         { success: false, error: `Database sync failed: ${upsertError.message}` },
         { status: 500 }

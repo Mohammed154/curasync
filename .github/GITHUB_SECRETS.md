@@ -11,13 +11,18 @@ Add these in: **GitHub repo → Settings → Secrets and variables → Actions �
 | `VERCEL_PROJECT_ID` | Vercel project → Settings → General → Project ID |
 | `DATABASE_URL` | Supabase → Settings → Database → Connection string (pooler, port 6543) |
 | `DATABASE_URL_DIRECT` | Supabase → Settings → Database → Connection string (direct, port 5432) |
-| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk Dashboard → API Keys |
-| `CLERK_SECRET_KEY` | Clerk Dashboard → API Keys |
 | `NEXT_PUBLIC_APP_URL` | Your Vercel production URL |
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase → Settings → API → Project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase → Settings → API → anon public key |
-| `UPSTASH_REDIS_REST_URL` | Upstash Console → Database → REST URL |
-| `UPSTASH_REDIS_REST_TOKEN` | Upstash Console → Database → REST Token |
+| `NEXT_PUBLIC_FIREBASE_API_KEY` | Firebase Console → Project Settings → Web App SDK config |
+| `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` | Firebase Console → Project Settings → Web App SDK config |
+| `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | Firebase Console → Project Settings → General |
+| `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` | Firebase Console → Storage / Project Settings |
+| `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` | Firebase Console → Project Settings → Cloud Messaging |
+| `NEXT_PUBLIC_FIREBASE_APP_ID` | Firebase Console → Project Settings → Web App SDK config |
+| `FIREBASE_PROJECT_ID` | Firebase Console → Project Settings |
+| `FIREBASE_CLIENT_EMAIL` | Firebase Console → Project Settings → Service accounts → Generate new private key |
+| `FIREBASE_PRIVATE_KEY` | Firebase Console → Project Settings → Service accounts → private_key from JSON |
 
 ## Required for full functionality (add before go-live)
 

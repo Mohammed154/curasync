@@ -21,6 +21,17 @@ const ENV_SPECS: EnvSpec[] = [
   { key: "SUPABASE_PDF_FUNCTION_NAME",         required: "optional",    description: "Supabase Edge Function name for PDF export (e.g. html-to-pdf)" },
   { key: "SUPABASE_SERVICE_ROLE_KEY",          required: "optional",    description: "Supabase Service Role Key (for Edge Functions & Admin)" },
 
+  // Firebase Client SDK
+  { key: "NEXT_PUBLIC_FIREBASE_API_KEY",       required: "optional",    description: "Firebase Client API key" },
+  { key: "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN",    required: "optional",    description: "Firebase Auth domain" },
+  { key: "NEXT_PUBLIC_FIREBASE_PROJECT_ID",     required: "optional",    description: "Firebase Project ID" },
+  { key: "NEXT_PUBLIC_FIREBASE_APP_ID",         required: "optional",    description: "Firebase Web App ID" },
+
+  // Firebase Admin SDK
+  { key: "FIREBASE_PROJECT_ID",                required: "optional",    description: "Firebase Admin Project ID" },
+  { key: "FIREBASE_CLIENT_EMAIL",              required: "optional",    description: "Firebase Admin Client Email" },
+  { key: "FIREBASE_PRIVATE_KEY",               required: "optional",    description: "Firebase Admin Private Key" },
+
   // Optional (feature-gated)
   { key: "GEMINI_API_KEY",                     required: "optional",    description: "Gemini API key (AI Doctor feature)" },
   { key: "RESEND_API_KEY",                     required: "optional",    description: "Resend API key (email)" },

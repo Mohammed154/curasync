@@ -58,7 +58,7 @@ export default function JournalPage() {
 
   // Load entries from DB API
   useEffect(() => {
-    fetch("/api/v1/journal")
+    fetch("/api/v1/journal", { credentials: "include" })
       .then((res) => (res.ok ? res.json() : null))
       .then((json) => {
         if (json?.data && Array.isArray(json.data)) {
@@ -107,6 +107,7 @@ export default function JournalPage() {
       const res = await fetch("/api/v1/journal", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
           text: text.trim(),
           severity,

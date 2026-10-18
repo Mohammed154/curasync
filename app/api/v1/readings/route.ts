@@ -258,27 +258,32 @@ export async function GET(request: NextRequest) {
   const rangeEnd   = searchParams.get("rangeEnd");
 
   try {
-    const supabase = (await import("@/lib/supabase")).getSupabaseAdminClient();
-    let vitalsQuery = supabase
-      .from("vitals")
-      .select("id, user_id, type, value, unit, source, recorded_at, notes")
-      .eq("user_id", authCtx.userId);
+    const { db, vitals, readings } = await import("@/lib/db");
+    const { eq, and, desc, gte, lte } = await import("drizzle-orm");
 
-    if (type) vitalsQuery = vitalsQuery.eq("type", type);
-    if (rangeStart) vitalsQuery = vitalsQuery.gte("recorded_at", new Date(rangeStart).toISOString());
-    if (rangeEnd) vitalsQuery = vitalsQuery.lte("recorded_at", new Date(rangeEnd).toISOString());
-    vitalsQuery = vitalsQuery.order("recorded_at", { ascending: false }).limit(limit);
+    const vitalFilters = [
+      eq(vitals.userId, authCtx.userId),
+      ...(type ? [eq(vitals.type, type)] : []),
+      ...(rangeStart ? [gte(vitals.recordedAt, new Date(rangeStart))] : []),
+      ...(rangeEnd ? [lte(vitals.recordedAt, new Date(rangeEnd))] : []),
+    ];
 
-    const { data: vitalsRows } = await vitalsQuery;
+    const vitalsRows = await db
+      .select()
+      .from(vitals)
+      .where(and(...vitalFilters))
+      .orderBy(desc(vitals.recordedAt))
+      .limit(limit);
+
     if (vitalsRows && vitalsRows.length > 0) {
       const mapped = vitalsRows.map((v) => ({
         id: v.id,
-        patientId: v.user_id,
+        patientId: v.userId,
         type: v.type,
         value: v.value,
         unit: v.unit,
         source: v.source,
-        recordedAt: v.recorded_at,
+        recordedAt: v.recordedAt ? v.recordedAt.toISOString() : new Date().toISOString(),
         notes: v.notes,
       }));
       return NextResponse.json(
@@ -295,8 +300,6 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const { db, readings } = await import("@/lib/db");
-    const { eq, and, desc, gte, lte } = await import("drizzle-orm");
     const patId = authCtx.patientId as `${string}-${string}-${string}-${string}-${string}`;
 
     const filters = [
@@ -313,8 +316,19 @@ export async function GET(request: NextRequest) {
       .orderBy(desc(readings.recordedAt))
       .limit(limit);
 
+    const legacyMapped = rows.map((r) => ({
+      id: r.id,
+      patientId: r.patientId,
+      type: r.type,
+      value: r.value,
+      unit: r.unit,
+      source: r.source,
+      recordedAt: r.recordedAt ? r.recordedAt.toISOString() : new Date().toISOString(),
+      notes: r.notes,
+    }));
+
     return NextResponse.json(
-      { data: rows, meta: { total: rows.length, limit }, requestId, timestamp: new Date().toISOString() },
+      { data: legacyMapped, meta: { total: legacyMapped.length, limit }, requestId, timestamp: new Date().toISOString() },
       { status: 200 }
     );
   } catch (err) {

@@ -4,19 +4,19 @@ import React, { useState } from "react";
 import { Sparkles, ChevronDown, ChevronUp, TrendingDown, TrendingUp, Minus } from "lucide-react";
 import { clsx } from "clsx";
 
-interface WeeklyMetric {
+export interface WeeklyMetric {
   label: string;
   thisWeek: string;
-  lastWeek: string;
+  lastWeek?: string;
   trend: "better" | "worse" | "stable";
   unit: string;
 }
 
-interface WeeklySummaryCardProps {
-  patientName: string;
+export interface WeeklySummaryCardProps {
+  patientName?: string;
   weekOf: string;
   adherence: number;
-  adherenceDelta: number; // +/- vs last week
+  adherenceDelta?: number; // +/- vs last week
   metrics: WeeklyMetric[];
   narrativeSentences: string[];
 }
@@ -27,23 +27,20 @@ const TREND_CONFIG = {
   stable: { icon: Minus,        color: "#8888A8", label: "Stable" },
 };
 
-// Default weekly data — replaced by BullMQ-generated narrative in production
+// Default empty weekly summary fallback
 export const DEFAULT_WEEKLY_SUMMARY: WeeklySummaryCardProps = {
-  patientName: "Patient",
-  weekOf: "Apr 28 – May 4, 2026",
-  adherence: 87,
-  adherenceDelta: +4,
+  patientName: "Your",
+  weekOf: "This Week",
+  adherence: 100,
   metrics: [
-    { label: "Avg Blood Glucose", thisWeek: "138", lastWeek: "152", trend: "better", unit: "mg/dL" },
-    { label: "Avg Blood Pressure", thisWeek: "136/86", lastWeek: "134/85", trend: "worse", unit: "mmHg" },
-    { label: "Avg Heart Rate", thisWeek: "73", lastWeek: "75", trend: "better", unit: "bpm" },
-    { label: "Readings Logged", thisWeek: "21", lastWeek: "18", trend: "better", unit: "readings" },
+    { label: "Avg Blood Glucose", thisWeek: "--", trend: "stable", unit: "mg/dL" },
+    { label: "Avg Blood Pressure", thisWeek: "--", trend: "stable", unit: "mmHg" },
+    { label: "Avg Heart Rate", thisWeek: "--", trend: "stable", unit: "bpm" },
+    { label: "Readings Logged", thisWeek: "0", trend: "stable", unit: "readings" },
   ],
   narrativeSentences: [
-    "Your average blood glucose dropped from 152 to 138 mg/dL — a meaningful improvement toward your target range.",
-    "Blood pressure trended slightly higher this week. Continue Amlodipine as prescribed and limit sodium intake.",
-    "You took 87% of your medications on time — up 4 points from last week. Great consistency.",
-    "You logged 21 readings this week, your highest count in a month. Keep it up.",
+    "No readings logged yet this week. Log your biometrics to see personalized trends and insights.",
+    "Track your medications and daily readings to keep your care team informed.",
   ],
 };
 
@@ -56,6 +53,12 @@ export default function WeeklySummaryCard({
   narrativeSentences,
 }: WeeklySummaryCardProps) {
   const [expanded, setExpanded] = useState(false);
+
+  const title = !patientName || patientName.toLowerCase() === "your"
+    ? "Your Week in Review"
+    : patientName.endsWith("s")
+    ? `${patientName}' Week in Review`
+    : `${patientName}'s Week in Review`;
 
   return (
     <div className="bg-bg-card rounded-xl shadow-card overflow-hidden card-enter">
@@ -73,7 +76,7 @@ export default function WeeklySummaryCard({
               </p>
             </div>
             <h3 className="font-bold text-white text-lg leading-tight">
-              {patientName}&apos;s Week in Review
+              {title}
             </h3>
             <p className="text-white/50 text-xs mt-0.5">{weekOf}</p>
           </div>
@@ -82,9 +85,11 @@ export default function WeeklySummaryCard({
             <p className="font-bold text-white metric-value" style={{ fontSize: "22px" }}>
               {adherence}%
             </p>
-            <p className={clsx("text-xs font-semibold", adherenceDelta >= 0 ? "text-green-400" : "text-red-400")}>
-              {adherenceDelta >= 0 ? "+" : ""}{adherenceDelta}% vs last week
-            </p>
+            {adherenceDelta !== undefined && adherenceDelta !== 0 && (
+              <p className={clsx("text-xs font-semibold", adherenceDelta >= 0 ? "text-green-400" : "text-red-400")}>
+                {adherenceDelta >= 0 ? "+" : ""}{adherenceDelta}% vs last week
+              </p>
+            )}
           </div>
         </div>
       </div>
@@ -92,28 +97,32 @@ export default function WeeklySummaryCard({
       {/* Narrative */}
       <div className="px-4 py-4 bg-bg-lavender/40 border-b border-divider">
         <p className="text-text-primary text-sm leading-relaxed">
-          {narrativeSentences[0]}
+          {narrativeSentences[0] || "Track your daily biometrics and medications to view your weekly health summary."}
         </p>
         {expanded && narrativeSentences.slice(1).map((sentence, i) => (
           <p key={i} className="text-text-secondary text-sm leading-relaxed mt-2">
             {sentence}
           </p>
         ))}
-        <button
-          onClick={() => setExpanded((v) => !v)}
-          className="flex items-center gap-1 text-accent-violet text-xs font-semibold mt-2 hover:text-accent-lavender transition-colors"
-          aria-expanded={expanded}
-        >
-          {expanded ? <><ChevronUp size={13} />Show less</> : <><ChevronDown size={13} />Read full summary</>}
-        </button>
+        {narrativeSentences.length > 1 && (
+          <button
+            onClick={() => setExpanded((v) => !v)}
+            className="flex items-center gap-1 text-accent-violet text-xs font-semibold mt-2 hover:text-accent-lavender transition-colors"
+            aria-expanded={expanded}
+          >
+            {expanded ? <><ChevronUp size={13} />Show less</> : <><ChevronDown size={13} />Read full summary</>}
+          </button>
+        )}
       </div>
 
       {/* Metrics comparison table */}
       <div className="px-4 py-3">
         <div className="grid grid-cols-2 gap-2">
           {metrics.map((m) => {
-            const cfg = TREND_CONFIG[m.trend];
+            const cfg = TREND_CONFIG[m.trend] || TREND_CONFIG.stable;
             const Icon = cfg.icon;
+            const trendLabel = m.thisWeek === "--" ? "No data" : cfg.label;
+
             return (
               <div key={m.label} className="p-3 rounded-lg bg-bg-light">
                 <p className="text-xs text-text-tertiary mb-1">{m.label}</p>
@@ -126,9 +135,11 @@ export default function WeeklySummaryCard({
                 <div className="flex items-center gap-1 mt-1">
                   <Icon size={11} style={{ color: cfg.color }} aria-hidden="true" />
                   <span className="text-xs font-medium" style={{ color: cfg.color }}>
-                    {cfg.label}
+                    {trendLabel}
                   </span>
-                  <span className="text-xs text-text-tertiary">· was {m.lastWeek}</span>
+                  {m.lastWeek ? (
+                    <span className="text-xs text-text-tertiary">· was {m.lastWeek}</span>
+                  ) : null}
                 </div>
               </div>
             );

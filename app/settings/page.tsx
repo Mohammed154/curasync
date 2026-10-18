@@ -260,7 +260,7 @@ export default function SettingsPage() {
                     <div className="space-y-3">
                       {[
                         { id: "biometricUnlock", label: "Biometric / Face ID unlock", desc: "Unlock app with Face ID or fingerprint" },
-                        { id: "shareWithProviders", label: "Share data with care team", desc: "Dr. Priya can view your health data" },
+                        { id: "shareWithProviders", label: "Share data with care team", desc: "Your care team can view your health data" },
                       ].map((n) => (
                         <div key={n.id} className="flex items-center justify-between py-2 border-b border-divider">
                           <div>

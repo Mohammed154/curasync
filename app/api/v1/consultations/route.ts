@@ -132,7 +132,7 @@ export async function POST(request: NextRequest) {
           patientId:             patId,
           createdBy:             authCtx.clerkUserId,
           title:                 "Upcoming Video Consultation (Tomorrow)",
-          description:           `Consultation with ${providerId === "dev_provider_001" ? "Dr. Priya Sharma" : "Provider"} scheduled for tomorrow at ${scheduledDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}.`,
+          description:           `Consultation with ${providerId === "dev_provider_001" ? "Primary Care Physician" : "Provider"} scheduled for tomorrow at ${scheduledDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}.`,
           dueDate:               rem24h,
           reminderType:          "consultation",
           relatedConsultationId: inserted?.id,

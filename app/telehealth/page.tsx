@@ -242,7 +242,7 @@ export default function TelehealthPage() {
                   <span>Doctor Offline</span>
                 </button>
                 <div className="absolute right-0 top-full mt-2 hidden group-hover:block z-30 w-64 p-2.5 bg-bg-card rounded-xl shadow-card border border-divider text-[11px] text-text-secondary">
-                  Dr. Priya Sharma is currently offline. You can schedule an upcoming consultation or message their team.
+                  Your doctor is currently offline. You can schedule an upcoming consultation or message their team.
                 </div>
               </div>
             ) : (

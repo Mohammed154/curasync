@@ -129,7 +129,7 @@ export function useDoctorConnection(providerId: string = "dev_provider_001") {
     loading: !data && !error,
     connected: Boolean(data?.connected),
     status: data?.status || "not_connected",
-    provider: data?.provider || { id: providerId, name: "Dr. Priya Sharma", specialty: "Internal Medicine & Chronic Care" },
+    provider: data?.provider || { id: providerId, name: "Primary Care Physician", specialty: "Internal Medicine & Chronic Care" },
     doctorPresence: effectivePresence,
     isDoctorOnline: Boolean(effectivePresence.online),
     connectDoctor,

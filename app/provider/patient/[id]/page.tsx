@@ -287,7 +287,7 @@ export default function ProviderPatientDetailPage({ params }: Props) {
                 {notes.map((note, i) => (
                   <div key={i} className={clsx("px-4 py-3", i < notes.length - 1 && "border-b border-divider")}>
                     <p className="text-sm text-text-primary leading-relaxed">{note}</p>
-                    <p className="text-xs text-text-tertiary mt-1">{format(new Date(), "MMM d, h:mm a")} · Dr. Priya</p>
+                    <p className="text-xs text-text-tertiary mt-1">{format(new Date(), "MMM d, h:mm a")} · Care Team</p>
                   </div>
                 ))}
               </div>

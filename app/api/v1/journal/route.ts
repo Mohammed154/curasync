@@ -50,23 +50,31 @@ export async function POST(request: NextRequest) {
   const editableUntil = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000); // 2-day edit window
   const patId = authCtx.patientId as `${string}-${string}-${string}-${string}-${string}`;
 
-  const [inserted] = await db.insert(journalEntries).values({
-    patientId:    patId,
-    text:         parsed.data.text,
-    severity:     parsed.data.severity,
-    conditionId:  parsed.data.conditionId,
-    bodyLocation: parsed.data.bodyLocation,
-    contextTags:  parsed.data.contextTags,
-    recordedAt:   parsed.data.recordedAt ? new Date(parsed.data.recordedAt) : new Date(),
-    editableUntil,
-  }).returning();
+  try {
+    const [inserted] = await db.insert(journalEntries).values({
+      patientId:    patId,
+      text:         parsed.data.text,
+      severity:     parsed.data.severity,
+      conditionId:  parsed.data.conditionId,
+      bodyLocation: parsed.data.bodyLocation,
+      contextTags:  parsed.data.contextTags,
+      recordedAt:   parsed.data.recordedAt ? new Date(parsed.data.recordedAt) : new Date(),
+      editableUntil,
+    }).returning();
 
-  void writeAuditLog({ actorId: authCtx.clerkUserId, action: "WRITE", resource: "journal_entries", resourceId: inserted?.id, patientId: authCtx.patientId, ...getRequestMeta(request) });
+    void writeAuditLog({ actorId: authCtx.clerkUserId, action: "WRITE", resource: "journal_entries", resourceId: inserted?.id, patientId: authCtx.patientId, ...getRequestMeta(request) });
 
-  return NextResponse.json(
-    { data: inserted, meta: { entriesRemainingToday: rl.remaining }, requestId, timestamp: new Date().toISOString() },
-    { status: 201, headers: { "X-RateLimit-Remaining": String(rl.remaining) } }
-  );
+    return NextResponse.json(
+      { data: inserted, meta: { entriesRemainingToday: rl.remaining }, requestId, timestamp: new Date().toISOString() },
+      { status: 201, headers: { "X-RateLimit-Remaining": String(rl.remaining) } }
+    );
+  } catch (err: any) {
+    console.error("[journal] DB insert error:", err);
+    return NextResponse.json(
+      { error: "Failed to save journal entry to database", detail: err?.message || String(err), requestId },
+      { status: 500 }
+    );
+  }
 }
 
 export async function PATCH(request: NextRequest) {

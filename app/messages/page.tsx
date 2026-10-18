@@ -52,7 +52,7 @@ export default function MessagesPage() {
             .map((m: any) => ({
               id: m.id,
               senderId: (m.senderRole === "provider" ? "provider" : "patient") as "patient" | "provider",
-              senderName: m.senderRole === "provider" ? "Dr. Priya Sharma" : (profile?.display_name || user?.displayName || "You"),
+              senderName: m.senderRole === "provider" ? "Care Team Physician" : (profile?.display_name || user?.displayName || "You"),
               content: m.content,
               timestamp: new Date(m.sentAt || m.insertedAt || m.created_at || Date.now()),
               read: Boolean(m.readAt),
@@ -94,7 +94,7 @@ export default function MessagesPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           threadId,
-          recipientId: "provider_dr_priya_sharma",
+          recipientId: "provider_care_team",
           content: textToSend,
           senderRole: "patient",
         }),

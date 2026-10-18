@@ -29,7 +29,7 @@ const presenceRegistry = new Map<string, { timestamp: number; status: "available
 
 const DEFAULT_DOCTOR: ProviderInfo = {
   id: "dev_provider_001",
-  name: "Dr. Priya Sharma",
+  name: "Primary Care Physician",
   specialty: "Internal Medicine & Chronic Care",
 };
 

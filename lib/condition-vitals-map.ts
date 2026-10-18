@@ -50,12 +50,19 @@ export const VITAL_METADATA: Record<string, VitalDisplayMeta> = {
     label: "Blood Pressure",
     unit: "mmHg",
     icon: "💉",
-    getValue: (r) => (r.systolic != null && r.diastolic != null ? `${r.systolic}/${r.diastolic}` : "--"),
+    getValue: (r) => {
+      if (r.systolic != null && r.diastolic != null) return `${r.systolic}/${r.diastolic}`;
+      if (r.systolic != null) return `${r.systolic}/--`;
+      if (r.diastolic != null) return `--/${r.diastolic}`;
+      return "--";
+    },
     getStatus: (r) => {
       const s = r.systolic;
       const d = r.diastolic;
-      if (s == null || d == null) return "green";
-      return s > 180 || d > 120 ? "red" : s > 130 || d > 85 ? "amber" : "green";
+      if (s == null && d == null) return "green";
+      if ((s != null && s > 180) || (d != null && d > 120)) return "red";
+      if ((s != null && s > 130) || (d != null && d > 85)) return "amber";
+      return "green";
     },
   },
   heart_rate: {
@@ -99,8 +106,12 @@ export const VITAL_METADATA: Record<string, VitalDisplayMeta> = {
     label: "HbA1c",
     unit: "%",
     icon: "📊",
-    getValue: () => "--",
-    getStatus: () => "green",
+    getValue: (r) => (r.hba1c != null ? String(r.hba1c) : "--"),
+    getStatus: (r) => {
+      const v = r.hba1c;
+      if (v == null) return "green";
+      return v >= 8 ? "red" : v >= 7 ? "amber" : "green";
+    },
   },
   weight: {
     key: "weight",
@@ -110,6 +121,32 @@ export const VITAL_METADATA: Record<string, VitalDisplayMeta> = {
     icon: "⚖️",
     getValue: (r) => (r.weight != null ? String(r.weight) : "--"),
     getStatus: () => "green",
+  },
+  body_temp: {
+    key: "body_temp",
+    type: "body_temp",
+    label: "Body Temperature",
+    unit: "°C",
+    icon: "🌡️",
+    getValue: (r) => (r.bodyTemp != null ? String(r.bodyTemp) : "--"),
+    getStatus: (r) => {
+      const v = r.bodyTemp;
+      if (v == null) return "green";
+      return v >= 38.5 || v <= 35 ? "red" : v >= 37.8 ? "amber" : "green";
+    },
+  },
+  steps: {
+    key: "steps",
+    type: "steps",
+    label: "Daily Steps",
+    unit: "steps",
+    icon: "🚶",
+    getValue: (r) => (r.steps != null ? r.steps.toLocaleString() : "--"),
+    getStatus: (r) => {
+      const v = r.steps;
+      if (v == null) return "green";
+      return v < 3000 ? "amber" : "green";
+    },
   },
   peak_flow: {
     key: "peak_flow",
@@ -123,17 +160,55 @@ export const VITAL_METADATA: Record<string, VitalDisplayMeta> = {
 };
 
 /**
- * Returns de-duplicated vital card keys for a given set of condition IDs,
- * consolidating systolic/diastolic blood pressure into a single "blood_pressure" card,
- * capped at maxCount (default 4).
+ * Returns de-duplicated vital card keys for a given set of condition IDs and latest logged readings,
+ * consolidating systolic/diastolic blood pressure into a single "blood_pressure" card.
+ * Prioritizes vitals with logged values so newly recorded metrics always display on the UI.
  */
 export function getRelevantVitalKeysForConditions(
   conditions: ConditionId[],
-  maxCount = 4
+  maxCount = 4,
+  latest?: LatestReadings
 ): string[] {
   const result: string[] = [];
   const seen = new Set<string>();
 
+  // 1. Prioritize vitals that have real logged values so user sees their logged entries immediately
+  if (latest) {
+    if (latest.bloodGlucose != null && !seen.has("blood_glucose")) {
+      seen.add("blood_glucose");
+      result.push("blood_glucose");
+    }
+    if ((latest.systolic != null || latest.diastolic != null) && !seen.has("blood_pressure")) {
+      seen.add("blood_pressure");
+      result.push("blood_pressure");
+    }
+    if (latest.weight != null && !seen.has("weight")) {
+      seen.add("weight");
+      result.push("weight");
+    }
+    if (latest.bodyTemp != null && !seen.has("body_temp")) {
+      seen.add("body_temp");
+      result.push("body_temp");
+    }
+    if (latest.steps != null && !seen.has("steps")) {
+      seen.add("steps");
+      result.push("steps");
+    }
+    if (latest.heartRate != null && !seen.has("heart_rate")) {
+      seen.add("heart_rate");
+      result.push("heart_rate");
+    }
+    if (latest.spo2 != null && !seen.has("spo2")) {
+      seen.add("spo2");
+      result.push("spo2");
+    }
+    if (latest.hba1c != null && !seen.has("hba1c")) {
+      seen.add("hba1c");
+      result.push("hba1c");
+    }
+  }
+
+  // 2. Add remaining condition-specific vitals up to maxCount
   for (const condition of conditions) {
     const vitals = CONDITION_VITALS_MAP[condition] ?? [];
     for (const v of vitals) {
@@ -146,16 +221,14 @@ export function getRelevantVitalKeysForConditions(
         seen.add(normalizedKey);
         result.push(normalizedKey);
       }
-      if (result.length >= maxCount) {
-        return result;
-      }
     }
   }
 
-  // Fallback if patient has no conditions or RA only
+  // 3. Fallback defaults if still empty
   if (result.length === 0) {
     return ["blood_glucose", "blood_pressure"];
   }
 
-  return result.slice(0, maxCount);
+  const cap = Math.max(maxCount, Math.min(result.length, 6));
+  return result.slice(0, cap);
 }

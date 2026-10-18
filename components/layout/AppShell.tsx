@@ -85,8 +85,8 @@ export default function AppShell({
   const [notifications, setNotifications] = useState<Alert[]>([]);
 
   const { user, profile } = useAuth();
-  const displayName = user?.displayName || profile?.display_name || (role === "provider" ? "Dr. Priya Sharma" : "Patient");
-  const userEmail = user?.email || profile?.email || (role === "provider" ? "dr.priya@curasync.care" : "patient@curasync.care");
+  const displayName = user?.displayName || profile?.display_name || (role === "provider" ? "Attending Physician" : "Patient");
+  const userEmail = user?.email || profile?.email || (role === "provider" ? "doctor@curasync.care" : "patient@curasync.care");
   const initials = displayName
     .split(" ")
     .filter(Boolean)
@@ -393,12 +393,18 @@ export default function AppShell({
               >
                 <Menu size={20} />
               </button>
-              <div className="flex items-center gap-1.5 text-label-sm text-text-secondary">
-                <MapPin size={13} className="text-accent-violet" />
-                <span className="font-semibold text-text-primary">Mumbai</span>
-                <span className="text-divider mx-1">·</span>
-                <span className="text-text-tertiary">400 001</span>
-              </div>
+              {profile?.city && profile.city.toLowerCase() !== "mumbai" && (
+                <div className="flex items-center gap-1.5 text-label-sm text-text-secondary">
+                  <MapPin size={13} className="text-accent-violet" />
+                  <span className="font-semibold text-text-primary">{profile.city}</span>
+                  {profile.country && (
+                    <>
+                      <span className="text-divider mx-1">·</span>
+                      <span className="text-text-tertiary">{profile.country}</span>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="flex items-center gap-2 relative">

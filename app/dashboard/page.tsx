@@ -7,7 +7,7 @@ import VitalCard from "@/components/patient/VitalCard";
 import MedicationCard from "@/components/patient/MedicationCard";
 import GlucoseChart from "@/components/charts/GlucoseChart";
 import LogReadingModal from "@/components/modals/LogReadingModal";
-import WeeklySummaryCard, { DEFAULT_WEEKLY_SUMMARY } from "@/components/dashboard/WeeklySummaryCard";
+import WeeklySummaryCard, { type WeeklySummaryCardProps, type WeeklyMetric } from "@/components/dashboard/WeeklySummaryCard";
 import UpcomingRemindersStrip, { type UpcomingDose } from "@/components/dashboard/UpcomingRemindersStrip";
 import AdherenceStreakCard from "@/components/patient/AdherenceStreakCard";
 import ConditionTile from "@/components/patient/ConditionTile";
@@ -16,7 +16,7 @@ import { getRelevantVitalKeysForConditions, VITAL_METADATA } from "@/lib/conditi
 import { useReadings, useAlerts, useMedications, patchAlert, logDose as apiLogDose } from "@/hooks/useApi";
 import { useAuth } from "@/context/AuthContext";
 import type { DashboardData, Alert, TodayMedication, ConditionId, SparklinePoint, LatestReadings, ConditionSummary } from "@/types";
-import { format } from "date-fns";
+import { format, subDays } from "date-fns";
 import Link from "next/link";
 import { RefreshCw, PlusCircle, ChevronDown, ChevronUp, Video, MapPin, CheckCircle2, X, Loader2, ShieldAlert, UserPlus, Lock, Stethoscope } from "lucide-react";
 import { getBrowserLocation } from "@/lib/location";
@@ -138,6 +138,15 @@ export default function DashboardPage() {
           break;
         case "weight":
           base.weight = parseFloat(numVal.toFixed(1));
+          break;
+        case "body_temp":
+          base.bodyTemp = parseFloat(numVal.toFixed(1));
+          break;
+        case "steps":
+          base.steps = Math.round(numVal);
+          break;
+        case "hba1c":
+          base.hba1c = parseFloat(numVal.toFixed(1));
           break;
       }
     }
@@ -298,11 +307,174 @@ export default function DashboardPage() {
     : 100;
   const streakDays = 0;
 
-  // ── Condition-derived relevant vitals (Capped at 4) ───────────────────────
+  // ── Condition-derived & logged relevant vitals (Up to 6) ───────────────────
   const relevantVitalKeys = useMemo(
-    () => getRelevantVitalKeysForConditions(patientConditions, 4),
-    [patientConditions]
+    () => getRelevantVitalKeysForConditions(patientConditions, 4, latestReadings),
+    [patientConditions, latestReadings]
   );
+
+  // ── Dynamic Weekly Summary from Live DB Data ─────────────────────────────
+  const weeklySummaryData: WeeklySummaryCardProps = useMemo(() => {
+    const now = new Date();
+    const sevenDaysAgo = subDays(now, 7);
+    const fourteenDaysAgo = subDays(now, 14);
+
+    const weekOf = `${format(sevenDaysAgo, "MMM d")} – ${format(now, "MMM d, yyyy")}`;
+    const displayName = patientDisplayName?.split(" ")[0] || "Your";
+
+    const allReadings = readingsData || [];
+    const thisWeekReadings = allReadings.filter((r) => {
+      const d = new Date(r.recordedAt || (r as any).recorded_at || 0);
+      return !isNaN(d.getTime()) && d >= sevenDaysAgo;
+    });
+    const lastWeekReadings = allReadings.filter((r) => {
+      const d = new Date(r.recordedAt || (r as any).recorded_at || 0);
+      return !isNaN(d.getTime()) && d >= fourteenDaysAgo && d < sevenDaysAgo;
+    });
+
+    const calcAvg = (readings: typeof allReadings, type: string) => {
+      const matching = readings.filter((r) => r.type === type && !isNaN(parseFloat(r.value)));
+      if (matching.length === 0) return null;
+      const sum = matching.reduce((acc, curr) => acc + parseFloat(curr.value), 0);
+      return Math.round(sum / matching.length);
+    };
+
+    // Blood Glucose
+    const bgThis = calcAvg(thisWeekReadings, "blood_glucose");
+    const bgLast = calcAvg(lastWeekReadings, "blood_glucose");
+
+    // Blood Pressure
+    const sysThis = calcAvg(thisWeekReadings, "blood_pressure_systolic");
+    const diaThis = calcAvg(thisWeekReadings, "blood_pressure_diastolic");
+    const sysLast = calcAvg(lastWeekReadings, "blood_pressure_systolic");
+    const diaLast = calcAvg(lastWeekReadings, "blood_pressure_diastolic");
+
+    // Heart Rate
+    const hrThis = calcAvg(thisWeekReadings, "heart_rate");
+    const hrLast = calcAvg(lastWeekReadings, "heart_rate");
+
+    // Readings count
+    const countThis = thisWeekReadings.length;
+    const countLast = lastWeekReadings.length;
+
+    const metrics: WeeklyMetric[] = [];
+
+    // Blood Glucose metric
+    if (bgThis !== null) {
+      let trend: "better" | "worse" | "stable" = "stable";
+      if (bgLast !== null) {
+        trend = bgThis < bgLast ? "better" : bgThis > bgLast ? "worse" : "stable";
+      }
+      metrics.push({
+        label: "Avg Blood Glucose",
+        thisWeek: String(bgThis),
+        lastWeek: bgLast !== null ? String(bgLast) : undefined,
+        trend,
+        unit: "mg/dL",
+      });
+    } else {
+      metrics.push({
+        label: "Avg Blood Glucose",
+        thisWeek: "--",
+        trend: "stable",
+        unit: "mg/dL",
+      });
+    }
+
+    // Blood Pressure metric
+    if (sysThis !== null && diaThis !== null) {
+      let trend: "better" | "worse" | "stable" = "stable";
+      if (sysLast !== null && diaLast !== null) {
+        trend = (sysThis <= sysLast && diaThis <= diaLast) ? "better" : (sysThis > sysLast || diaThis > diaLast) ? "worse" : "stable";
+      }
+      metrics.push({
+        label: "Avg Blood Pressure",
+        thisWeek: `${sysThis}/${diaThis}`,
+        lastWeek: (sysLast !== null && diaLast !== null) ? `${sysLast}/${diaLast}` : undefined,
+        trend,
+        unit: "mmHg",
+      });
+    } else {
+      metrics.push({
+        label: "Avg Blood Pressure",
+        thisWeek: "--",
+        trend: "stable",
+        unit: "mmHg",
+      });
+    }
+
+    // Heart Rate metric
+    if (hrThis !== null) {
+      let trend: "better" | "worse" | "stable" = "stable";
+      if (hrLast !== null) {
+        trend = Math.abs(hrThis - 72) <= Math.abs(hrLast - 72) ? "better" : "worse";
+      }
+      metrics.push({
+        label: "Avg Heart Rate",
+        thisWeek: String(hrThis),
+        lastWeek: hrLast !== null ? String(hrLast) : undefined,
+        trend,
+        unit: "bpm",
+      });
+    } else {
+      metrics.push({
+        label: "Avg Heart Rate",
+        thisWeek: "--",
+        trend: "stable",
+        unit: "bpm",
+      });
+    }
+
+    // Readings count metric
+    metrics.push({
+      label: "Readings Logged",
+      thisWeek: String(countThis),
+      lastWeek: countLast > 0 ? String(countLast) : undefined,
+      trend: countThis >= countLast ? (countThis > countLast ? "better" : "stable") : "worse",
+      unit: "readings",
+    });
+
+    // Build dynamic narrative sentences based on actual user data
+    const narrativeSentences: string[] = [];
+    if (bgThis !== null) {
+      if (bgLast !== null) {
+        if (bgThis < bgLast) {
+          narrativeSentences.push(`Your average blood glucose dropped from ${bgLast} to ${bgThis} mg/dL — an improvement toward your target range.`);
+        } else if (bgThis > bgLast) {
+          narrativeSentences.push(`Your average blood glucose was ${bgThis} mg/dL this week (compared to ${bgLast} mg/dL last week).`);
+        } else {
+          narrativeSentences.push(`Your average blood glucose remained steady at ${bgThis} mg/dL this week.`);
+        }
+      } else {
+        narrativeSentences.push(`Your average blood glucose this week is ${bgThis} mg/dL.`);
+      }
+    }
+
+    if (sysThis !== null && diaThis !== null) {
+      narrativeSentences.push(`Your average blood pressure is ${sysThis}/${diaThis} mmHg this week.`);
+    }
+
+    if (todayMedications.length > 0) {
+      narrativeSentences.push(`You have an adherence rate of ${weeklyAdherence}% for scheduled medications.`);
+    }
+
+    if (countThis > 0) {
+      narrativeSentences.push(`You logged ${countThis} reading${countThis === 1 ? "" : "s"} this week. Great job keeping your records up to date.`);
+    }
+
+    if (narrativeSentences.length === 0) {
+      narrativeSentences.push("No readings logged yet this week. Log your biometrics to generate personalized weekly insights and trend analysis.");
+      narrativeSentences.push("Consistent tracking helps you and your care team monitor your health progress.");
+    }
+
+    return {
+      patientName: displayName,
+      weekOf,
+      adherence: weeklyAdherence,
+      metrics,
+      narrativeSentences,
+    };
+  }, [readingsData, patientDisplayName, todayMedications, weeklyAdherence]);
 
   return (
     <AppShell alertCount={activeAlerts.length}>
@@ -321,7 +493,7 @@ export default function DashboardPage() {
                   {patientConditions.length} conditions
                 </span>
               </p>
-              {profile?.city && (
+              {profile?.city && profile.city.toLowerCase() !== "mumbai" && (
                 <span className="inline-flex items-center gap-1 text-xs text-text-secondary bg-bg-card border border-divider px-2.5 py-0.5 rounded-full shadow-xs">
                   <MapPin size={11} className="text-accent-violet" />
                   {[profile.city, profile.country].filter(Boolean).join(", ")}
@@ -345,7 +517,7 @@ export default function DashboardPage() {
               <Link
                 href="/telehealth"
                 className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-text-tertiary text-label-sm font-medium border border-divider shadow-xs transition-all"
-                title="Dr. Priya Sharma is offline. Click to schedule an upcoming visit."
+                title="Doctor is offline. Click to schedule an upcoming visit."
               >
                 <span className="w-1.5 h-1.5 rounded-full bg-gray-400" />
                 <span>Doctor Offline</span>
@@ -545,7 +717,11 @@ export default function DashboardPage() {
                 ? "grid-cols-1 sm:grid-cols-2"
                 : relevantVitalKeys.length === 3
                 ? "grid-cols-1 sm:grid-cols-3"
-                : "grid-cols-2 sm:grid-cols-4"
+                : relevantVitalKeys.length === 4
+                ? "grid-cols-2 sm:grid-cols-4"
+                : relevantVitalKeys.length === 5
+                ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-5"
+                : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-6"
             }`}
           >
             {relevantVitalKeys.map((vitalKey) => {
@@ -615,7 +791,7 @@ export default function DashboardPage() {
                   <ConditionTile key={summary.conditionId} summary={summary} />
                 ))}
               </div>
-              <WeeklySummaryCard {...DEFAULT_WEEKLY_SUMMARY} />
+              <WeeklySummaryCard {...weeklySummaryData} />
             </div>
           )}
         </div>

@@ -100,7 +100,7 @@ export default function ProviderTelehealthPage() {
         roomName={activeRoom.roomName}
         token={(activeRoom as any).token}
         patientName={activeRoom.patientName}
-        providerName="Dr. Priya Sharma"
+        providerName="Attending Physician"
         onLeave={() => setActiveRoom(null)}
       />
     );
@@ -117,7 +117,7 @@ export default function ProviderTelehealthPage() {
               Clinical Telehealth Sessions
             </h1>
             <p className="text-body-md text-text-secondary mt-1">
-              Dr. Priya Sharma · Manage video rooms and start consultations with patients.
+              Manage video rooms and start consultations with patients.
             </p>
           </div>
 

@@ -20,7 +20,7 @@ export default function MedicationsPage() {
 
   // Load medications from DB API
   useEffect(() => {
-    fetch("/api/v1/medications")
+    fetch("/api/v1/medications", { credentials: "include" })
       .then((res) => (res.ok ? res.json() : null))
       .then((json) => {
         if (json?.data && Array.isArray(json.data)) {
@@ -63,6 +63,7 @@ export default function MedicationsPage() {
       await fetch("/api/v1/medications", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
           medicationId: id,
           status,
@@ -99,6 +100,7 @@ export default function MedicationsPage() {
       const res = await fetch("/api/v1/medications", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
           action: "create_medication",
           name: newMed.name,

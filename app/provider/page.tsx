@@ -129,7 +129,7 @@ export default function ProviderDashboardPage() {
               Patient Panel
             </h1>
             <p className="text-body-md text-text-secondary mt-1">
-              Dr. Priya · {allPatients.length} patients assigned
+              Clinical Panel · {allPatients.length} patients assigned
             </p>
           </div>
           <div className="flex items-center gap-2">

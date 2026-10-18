@@ -9,6 +9,32 @@ import { getPatientAuth, isNextResponse } from "@/lib/auth";
 import { writeAuditLog, getRequestMeta } from "@/lib/audit";
 
 
+function normalizeDoseFrequency(freq?: string): string {
+  if (!freq) return "once_daily";
+  const map: Record<string, string> = {
+    once_daily: "once_daily",
+    twice_daily: "twice_daily",
+    three_daily: "three_times_daily",
+    three_times_daily: "three_times_daily",
+    four_daily: "four_times_daily",
+    four_times_daily: "four_times_daily",
+    every_morning: "every_morning",
+    every_night: "every_night",
+    prn: "as_needed",
+    as_needed: "as_needed",
+    weekly: "weekly",
+    every_x_hours: "custom",
+    custom: "custom",
+  };
+  return map[freq.toLowerCase()] || "once_daily";
+}
+
+function normalizeConditionId(cId?: string): string {
+  const valid = ["diabetes_t1", "diabetes_t2", "hypertension", "ckd", "copd", "chf", "cad", "hypothyroidism", "ra", "asthma"];
+  if (cId && valid.includes(cId)) return cId;
+  return "diabetes_t2";
+}
+
 export const dynamic = "force-dynamic";
 
 const CreateMedicationSchema = z.object({
@@ -53,12 +79,15 @@ export async function POST(request: NextRequest) {
     }
 
     try {
+      const freq = normalizeDoseFrequency(parsed.data.frequency);
+      const cond = normalizeConditionId(parsed.data.conditionId);
+
       const [inserted] = await db.insert(medications).values({
         patientId:      patId,
         name:           parsed.data.name,
         dosage:         parsed.data.dosage,
-        frequency:      parsed.data.frequency,
-        conditionId:    parsed.data.conditionId,
+        frequency:      freq,
+        conditionId:    cond,
         scheduledTimes: parsed.data.scheduledTimes,
         startDate:      parsed.data.startDate,
         active:         true,
@@ -74,22 +103,12 @@ export async function POST(request: NextRequest) {
       });
 
       return NextResponse.json({ data: inserted, requestId, timestamp: new Date().toISOString() }, { status: 201 });
-    } catch (err) {
+    } catch (err: any) {
       console.error("[medications] DB insert error:", err);
-      // Fallback response for dev if DB not active
-      const fallbackMed = {
-        id: crypto.randomUUID(),
-        patientId: patId,
-        name: parsed.data.name,
-        dosage: parsed.data.dosage,
-        frequency: parsed.data.frequency,
-        conditionId: parsed.data.conditionId,
-        scheduledTimes: parsed.data.scheduledTimes,
-        startDate: parsed.data.startDate,
-        active: true,
-        createdAt: new Date(),
-      };
-      return NextResponse.json({ data: fallbackMed, requestId, timestamp: new Date().toISOString() }, { status: 201 });
+      return NextResponse.json(
+        { error: "Failed to create medication in database", detail: err?.message || String(err), requestId },
+        { status: 500 }
+      );
     }
   }
 

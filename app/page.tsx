@@ -414,7 +414,7 @@ export default function HomePage() {
             <p style={{ fontSize: 10, fontWeight: 600, color: "rgba(255,255,255,0.35)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 16 }}>Patient Panel · Live</p>
             {[
               { name: "Alex Rivera",  tags: "🩸 T2D · 💉 HTN · 🫘 CKD", adh: 87, status: "amber" },
-              { name: "Priya Sharma", tags: "💉 HTN · 💨 Asthma",       adh: 64, status: "red"   },
+              { name: "Ananya Sharma", tags: "💉 HTN · 💨 Asthma",      adh: 64, status: "red"   },
               { name: "Rajesh Patel", tags: "🩸 T2D · 🦋 Hypothyroidism", adh: 96, status: "green" },
               { name: "Kavita Nair",  tags: "🦴 RA · 💉 HTN",            adh: 98, status: "green" },
             ].map((p, i, arr) => {

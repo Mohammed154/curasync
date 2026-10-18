@@ -2,7 +2,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { verifyFirebaseIdToken } from "./firebase/admin";
-import { getSupabaseAdminClient } from "./supabase";
+import { db, patientProfiles, profiles } from "./db";
+import { eq } from "drizzle-orm";
 
 export type UserRole = "patient" | "provider" | "admin";
 
@@ -60,48 +61,50 @@ export async function getPatientAuth(
     );
   }
 
-  // Ensure user has a profile in public.profiles and resolve patient id
-  const supabase = getSupabaseAdminClient();
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("id, display_name")
-    .eq("id", uid)
-    .maybeSingle();
+  let patientId: string | null = null;
 
-  // Also check if legacy patient_profiles exists
-  const { data: legacyProfile } = await supabase
-    .from("patient_profiles")
-    .select("id")
-    .eq("user_id", uid)
-    .maybeSingle();
+  try {
+    // 1. Direct query to patient_profiles in Postgres
+    const [existingPatient] = await db
+      .select({ id: patientProfiles.id })
+      .from(patientProfiles)
+      .where(eq(patientProfiles.userId, uid))
+      .limit(1);
 
-  let patientId = legacyProfile?.id;
-  if (!patientId) {
-    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(uid)) {
-      patientId = uid;
+    if (existingPatient?.id) {
+      patientId = existingPatient.id;
     } else {
-      try {
-        const { data: newProfile } = await supabase
-          .from("patient_profiles")
-          .upsert(
-            {
-              user_id: uid,
-              name: profile?.display_name || "Patient",
-              date_of_birth: "1990-01-01",
-              conditions: [],
-              onboarding_complete: false,
-            },
-            { onConflict: "user_id" }
-          )
-          .select("id")
-          .single();
-        patientId = newProfile?.id;
-      } catch {
-        // Non-fatal fallback
+      // 2. Lookup profile display name if available
+      const [existingProfile] = await db
+        .select({ displayName: profiles.displayName })
+        .from(profiles)
+        .where(eq(profiles.id, uid))
+        .limit(1);
+
+      // Create new patient_profiles entry
+      const [newPatient] = await db
+        .insert(patientProfiles)
+        .values({
+          userId: uid,
+          name: existingProfile?.displayName || "Patient",
+          dateOfBirth: "1990-01-01",
+          conditions: [],
+        })
+        .onConflictDoUpdate({
+          target: patientProfiles.userId,
+          set: { updatedAt: new Date() },
+        })
+        .returning({ id: patientProfiles.id });
+
+      if (newPatient?.id) {
+        patientId = newPatient.id;
       }
     }
+  } catch (err) {
+    console.warn("[auth] Direct DB patient lookup/upsert warning:", err);
   }
 
+  // Safety net fallback
   if (!patientId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(patientId)) {
     patientId = "00000000-0000-0000-0000-000000000001";
   }
@@ -112,7 +115,6 @@ export async function getPatientAuth(
     clerkUserId: uid,
     role: "patient",
   };
-
 }
 
 export async function getProviderAuth(

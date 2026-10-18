@@ -17,7 +17,7 @@ export default function DoctorConnectionModal({
   open,
   onClose,
   onConnected,
-  doctorName = "Dr. Priya Sharma",
+  doctorName = "Primary Care Physician",
   specialty = "Internal Medicine & Chronic Care",
   onConnect,
 }: DoctorConnectionModalProps) {

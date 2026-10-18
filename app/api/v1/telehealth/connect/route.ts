@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
       message: "Successfully connected with your healthcare provider.",
       provider: {
         id: providerId,
-        name: "Dr. Priya Sharma",
+        name: "Primary Care Physician",
         specialty: "Internal Medicine & Chronic Care",
       },
       requestId,

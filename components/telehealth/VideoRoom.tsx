@@ -29,7 +29,7 @@ export default function VideoRoom({
   roomName,
   token,
   patientName = "Patient",
-  providerName = "Dr. Priya Sharma",
+  providerName = "Primary Care Physician",
   onLeave,
 }: VideoRoomProps) {
   if (!token) {
@@ -242,7 +242,7 @@ export default function VideoRoom({
       chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
     }, 100);
 
-    // Auto-respond from Dr. Priya Sharma
+    // Auto-respond from doctor
     setTimeout(() => {
       const responses = [
         "Noted! I have documented that in your clinical record.",
@@ -390,7 +390,7 @@ export default function VideoRoom({
               </div>
             </div>
           ) : (
-            /* Clinician Video Feed (Dr. Priya Sharma) */
+            /* Clinician Video Feed */
             <div className="w-full h-full relative rounded-2xl overflow-hidden border border-slate-800 shadow-2xl bg-gradient-to-b from-[#0F172A] to-[#0A0E1A] flex flex-col items-center justify-center">
               
               {/* Subtle ambient lighting effect */}
@@ -408,7 +408,7 @@ export default function VideoRoom({
                   <div className="w-32 h-32 sm:w-40 sm:h-40 rounded-full gradient-violet p-1 shadow-2xl flex items-center justify-center relative z-10">
                     <div className="w-full h-full rounded-full bg-[#0F172A] flex flex-col items-center justify-center border-2 border-violet-400/40 overflow-hidden">
                       <Stethoscope size={48} className="text-violet-300 mb-1" />
-                      <span className="text-xs font-bold text-violet-200 tracking-wider">DR. PRIYA</span>
+                      <span className="text-xs font-bold text-violet-200 tracking-wider">DOCTOR</span>
                     </div>
                   </div>
 

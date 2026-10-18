@@ -163,6 +163,9 @@ export interface LatestReadings {
   heartRate: number;
   spo2: number;
   weight: number;
+  bodyTemp?: number;
+  steps?: number;
+  hba1c?: number;
   lastSyncedAt: string;
 }
 

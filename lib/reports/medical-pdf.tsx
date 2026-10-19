@@ -113,20 +113,39 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     flexDirection: "row",
     justifyContent: "space-between",
+    gap: 10,
   },
-  patientInfoCol: {
-    flex: 1,
+  patientInfoCol1: {
+    width: "28%",
+  },
+  patientInfoCol2: {
+    width: "48%",
+  },
+  patientInfoCol3: {
+    width: "24%",
   },
   patientLabel: {
     fontSize: 7,
     color: "#8888A8",
     textTransform: "uppercase",
-    marginBottom: 2,
+    marginBottom: 3,
   },
   patientValue: {
-    fontSize: 10,
+    fontSize: 9.5,
     fontWeight: "bold",
     color: "#1A1A2E",
+    marginBottom: 6,
+  },
+  patientEmailValue: {
+    fontSize: 8,
+    fontWeight: "bold",
+    color: "#1A1A2E",
+    marginBottom: 6,
+  },
+  patientIdValue: {
+    fontSize: 7.5,
+    fontWeight: "bold",
+    color: "#46465A",
     marginBottom: 6,
   },
   sectionTitle: {
@@ -250,23 +269,23 @@ export const MedicalReportDocument: React.FC<{ data: MedicalReportData }> = ({ d
         </View>
 
         <View style={styles.patientCard}>
-          <View style={styles.patientInfoCol}>
+          <View style={styles.patientInfoCol1}>
             <Text style={styles.patientLabel}>Patient Name</Text>
             <Text style={styles.patientValue}>{String(patient.displayName || "Patient")}</Text>
             <Text style={styles.patientLabel}>Patient ID / UID</Text>
-            <Text style={styles.patientValue}>{String(patient.userId)}</Text>
+            <Text style={styles.patientIdValue}>{String(patient.userId)}</Text>
           </View>
-          <View style={styles.patientInfoCol}>
+          <View style={styles.patientInfoCol2}>
             <Text style={styles.patientLabel}>Email Address</Text>
-            <Text style={styles.patientValue}>{String(patient.email)}</Text>
+            <Text style={styles.patientEmailValue}>{String(patient.email)}</Text>
             <Text style={styles.patientLabel}>Coverage Span</Text>
             <Text style={styles.patientValue}>{String(patient.reportingPeriod)}</Text>
           </View>
-          <View style={styles.patientInfoCol}>
+          <View style={styles.patientInfoCol3}>
             <Text style={styles.patientLabel}>Report Generated</Text>
             <Text style={styles.patientValue}>{String(patient.generatedAt)}</Text>
             <Text style={styles.patientLabel}>Med Adherence</Text>
-            <Text style={styles.patientValue}>{`${medicationAdherence.adherencePercentage}%`}</Text>
+            <Text style={[styles.patientValue, { color: "#00B894" }]}>{`${medicationAdherence.adherencePercentage}%`}</Text>
           </View>
         </View>
 
@@ -351,6 +370,56 @@ function formatVitalName(type: string): string {
 }
 
 /**
+ * Safely renders text in jsPDF within a maximum width boundary.
+ * Dynamically scales down font size and/or truncates with an ellipsis if needed
+ * to ensure text never overflows or collides with adjacent columns.
+ */
+function drawSafeText(
+  doc: jsPDF,
+  text: string,
+  x: number,
+  y: number,
+  maxWidth: number,
+  options?: {
+    align?: "left" | "center" | "right";
+    minFontSize?: number;
+  }
+) {
+  let str = String(text ?? "");
+  const align = options?.align || "left";
+  let width = doc.getTextWidth(str);
+
+  if (width <= maxWidth) {
+    doc.text(str, x, y, { align });
+    return;
+  }
+
+  const originalFontSize = doc.getFontSize();
+  const minFontSize = options?.minFontSize ?? Math.max(6.5, originalFontSize - 2);
+
+  // Attempt slight font reduction down to minFontSize
+  let currentSize = originalFontSize;
+  while (currentSize > minFontSize && width > maxWidth) {
+    currentSize -= 0.5;
+    doc.setFontSize(currentSize);
+    width = doc.getTextWidth(str);
+  }
+
+  if (width <= maxWidth) {
+    doc.text(str, x, y, { align });
+    doc.setFontSize(originalFontSize);
+    return;
+  }
+
+  // Truncate with ellipsis if still wider than boundary
+  while (str.length > 2 && doc.getTextWidth(str + "…") > maxWidth) {
+    str = str.slice(0, -1);
+  }
+  doc.text(str + "…", x, y, { align });
+  doc.setFontSize(originalFontSize);
+}
+
+/**
  * High-fidelity pure JS PDF generator using jsPDF
  * Immune to React reconciler / fiber version constraints
  */
@@ -386,68 +455,69 @@ function generateJsPdfBuffer(data: MedicalReportData): Buffer {
 
   y += 50;
 
-  // Patient Info Card
+  // Patient Info Card - 3-column proportional grid with overflow protection
   doc.setFillColor(248, 249, 250);
   doc.setDrawColor(226, 232, 240);
-  doc.roundedRect(40, y, pageWidth - 80, 68, 6, 6, "FD");
+  doc.roundedRect(40, y, pageWidth - 80, 72, 6, 6, "FD");
 
-  // Col 1
+  // Col 1 (Patient Info: Name & ID) - x: 54, width: 140
+  doc.setFont("helvetica", "normal");
   doc.setFontSize(7);
   doc.setTextColor(136, 136, 168);
-  doc.text("PATIENT NAME", 55, y + 18);
+  doc.text("PATIENT NAME", 54, y + 18);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(10);
+  doc.setFontSize(9.5);
   doc.setTextColor(26, 26, 46);
-  doc.text(String(data.patient.displayName || "Patient"), 55, y + 32);
+  drawSafeText(doc, String(data.patient.displayName || "Patient"), 54, y + 31, 136);
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7);
   doc.setTextColor(136, 136, 168);
-  doc.text("PATIENT ID / UID", 55, y + 46);
+  doc.text("PATIENT ID / UID", 54, y + 48);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(8);
+  doc.setFontSize(7.5);
   doc.setTextColor(70, 70, 90);
-  doc.text(String(data.patient.userId), 55, y + 58);
+  drawSafeText(doc, String(data.patient.userId), 54, y + 61, 136, { minFontSize: 6 });
 
-  // Col 2
+  // Col 2 (Email & Coverage Span) - x: 206, width: 224
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7);
   doc.setTextColor(136, 136, 168);
-  doc.text("EMAIL ADDRESS", 220, y + 18);
+  doc.text("EMAIL ADDRESS", 206, y + 18);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
+  doc.setFontSize(8.5);
   doc.setTextColor(26, 26, 46);
-  doc.text(String(data.patient.email), 220, y + 32);
+  drawSafeText(doc, String(data.patient.email), 206, y + 31, 224, { minFontSize: 7 });
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7);
   doc.setTextColor(136, 136, 168);
-  doc.text("COVERAGE SPAN", 220, y + 46);
+  doc.text("COVERAGE SPAN", 206, y + 48);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
+  doc.setFontSize(8.5);
   doc.setTextColor(26, 26, 46);
-  doc.text(String(data.patient.reportingPeriod), 220, y + 58);
+  drawSafeText(doc, String(data.patient.reportingPeriod), 206, y + 61, 224);
 
-  // Col 3
+  // Col 3 (Report Generated & Med Adherence) - x: 446, width: 100
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7);
   doc.setTextColor(136, 136, 168);
-  doc.text("REPORT GENERATED", 400, y + 18);
+  doc.text("REPORT GENERATED", 446, y + 18);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
+  doc.setFontSize(8.5);
   doc.setTextColor(26, 26, 46);
-  doc.text(String(data.patient.generatedAt), 400, y + 32);
+  drawSafeText(doc, String(data.patient.generatedAt), 446, y + 31, 100);
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7);
   doc.setTextColor(136, 136, 168);
-  doc.text("MED ADHERENCE", 400, y + 46);
+  doc.text("MED ADHERENCE", 446, y + 48);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
   doc.setTextColor(0, 184, 148);
-  doc.text(`${data.medicationAdherence.adherencePercentage}%`, 400, y + 58);
+  drawSafeText(doc, `${data.medicationAdherence.adherencePercentage}%`, 446, y + 61, 100);
 
-  y += 84;
+  y += 86;
 
   // Glycemic Control Header
   doc.setFont("helvetica", "bold");
@@ -506,8 +576,8 @@ function generateJsPdfBuffer(data: MedicalReportData): Buffer {
   doc.setFontSize(7.5);
   doc.setTextColor(71, 85, 105);
   doc.text("BIOMETRIC METRIC", 48, y + 12);
-  doc.text("RECORDED VALUE", 180, y + 12);
-  doc.text("SOURCE / CONTEXT", 300, y + 12);
+  doc.text("RECORDED VALUE", 185, y + 12);
+  doc.text("SOURCE / CONTEXT", 305, y + 12);
   doc.text("TIMESTAMP", 430, y + 12);
 
   y += 18;
@@ -527,17 +597,17 @@ function generateJsPdfBuffer(data: MedicalReportData): Buffer {
       doc.setFont("helvetica", "normal");
       doc.setFontSize(8);
       doc.setTextColor(26, 26, 46);
-      doc.text(formatVitalName(v.type), 48, y + 11);
+      drawSafeText(doc, formatVitalName(v.type), 48, y + 11, 130);
 
       doc.setFont("helvetica", "bold");
-      doc.text(`${v.value} ${v.unit}`, 180, y + 11);
+      drawSafeText(doc, `${v.value} ${v.unit}`, 185, y + 11, 110);
 
       doc.setFont("helvetica", "normal");
       doc.setTextColor(100, 116, 139);
-      doc.text(v.source || "Manual Entry", 300, y + 11);
+      drawSafeText(doc, v.source || "Manual Entry", 305, y + 11, 115);
 
       doc.setTextColor(148, 163, 184);
-      doc.text(v.recordedAt ? new Date(v.recordedAt).toLocaleString() : "—", 430, y + 11);
+      drawSafeText(doc, v.recordedAt ? new Date(v.recordedAt).toLocaleString() : "—", 430, y + 11, 120);
 
       y += 16;
     });
@@ -562,8 +632,8 @@ function generateJsPdfBuffer(data: MedicalReportData): Buffer {
   doc.setFontSize(7.5);
   doc.setTextColor(71, 85, 105);
   doc.text("MEDICATION", 48, y + 12);
-  doc.text("DOSAGE", 180, y + 12);
-  doc.text("STATUS", 300, y + 12);
+  doc.text("DOSAGE", 185, y + 12);
+  doc.text("STATUS", 305, y + 12);
   doc.text("SCHEDULED / LOGGED", 430, y + 12);
 
   y += 18;
@@ -583,10 +653,10 @@ function generateJsPdfBuffer(data: MedicalReportData): Buffer {
       doc.setFont("helvetica", "normal");
       doc.setFontSize(8);
       doc.setTextColor(26, 26, 46);
-      doc.text(m.name, 48, y + 11);
+      drawSafeText(doc, m.name, 48, y + 11, 130);
 
       doc.setTextColor(100, 116, 139);
-      doc.text(m.dosage, 180, y + 11);
+      drawSafeText(doc, m.dosage, 185, y + 11, 110);
 
       doc.setFont("helvetica", "bold");
       if (m.status === "taken") {
@@ -594,11 +664,11 @@ function generateJsPdfBuffer(data: MedicalReportData): Buffer {
       } else {
         doc.setTextColor(214, 48, 49);
       }
-      doc.text(m.status.toUpperCase(), 300, y + 11);
+      drawSafeText(doc, m.status.toUpperCase(), 305, y + 11, 115);
 
       doc.setFont("helvetica", "normal");
       doc.setTextColor(148, 163, 184);
-      doc.text(m.scheduledAt ? new Date(m.scheduledAt).toLocaleDateString() : "—", 430, y + 11);
+      drawSafeText(doc, m.scheduledAt ? new Date(m.scheduledAt).toLocaleDateString() : "—", 430, y + 11, 120);
 
       y += 16;
     });
@@ -606,7 +676,7 @@ function generateJsPdfBuffer(data: MedicalReportData): Buffer {
 
   y += 16;
 
-  // Physician Notes Box
+  // Physician Notes Box - Dynamic Height based on content
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
   doc.setTextColor(26, 26, 46);
@@ -616,11 +686,6 @@ function generateJsPdfBuffer(data: MedicalReportData): Buffer {
 
   y += 12;
 
-  doc.setFillColor(248, 250, 252);
-  doc.setDrawColor(108, 92, 231);
-  doc.roundedRect(40, y, pageWidth - 80, 48, 4, 4, "F");
-  doc.rect(40, y, 3, 48, "F");
-
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
   doc.setTextColor(51, 65, 85);
@@ -628,6 +693,13 @@ function generateJsPdfBuffer(data: MedicalReportData): Buffer {
     data.physicianNotes || "Patient is actively logging telemetry vitals. Fasting glucose tracking within stable reference range. Recommended: continue prescribed daily regimen, maintain hydration, and report blood pressure anomalies exceeding 140/90 mmHg. Bring this document to the next scheduled clinical evaluation.",
     pageWidth - 104
   );
+  const noteBoxHeight = Math.max(48, noteLines.length * 11 + 18);
+
+  doc.setFillColor(248, 250, 252);
+  doc.setDrawColor(108, 92, 231);
+  doc.roundedRect(40, y, pageWidth - 80, noteBoxHeight, 4, 4, "F");
+  doc.rect(40, y, 3, noteBoxHeight, "F");
+
   doc.text(noteLines, 52, y + 16);
 
   // Footer

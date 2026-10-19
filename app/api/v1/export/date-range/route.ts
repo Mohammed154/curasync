@@ -56,8 +56,8 @@ export async function GET(request: NextRequest) {
       .eq("id", userId)
       .maybeSingle();
 
-    const patientName = profile?.display_name || "Patient";
-    const patientEmail = profile?.email || `${userId}@curasync.care`;
+    const patientName = profile?.display_name || authCtx.displayName || "Patient";
+    const patientEmail = profile?.email || authCtx.email || "Not Provided";
 
     // 3. Query vitals strictly within range
     const { data: vitalsRows } = await supabase
@@ -207,7 +207,7 @@ export async function GET(request: NextRequest) {
       date_range_start: startIso,
       date_range_end: endIso,
       status: "completed",
-      recipient_email: patientEmail,
+      recipient_email: patientEmail === "Not Provided" ? null : patientEmail,
     });
 
     const startFilename = rangeStartParam.slice(0, 10);

@@ -12,12 +12,16 @@ export interface AuthContext {
   patientId: string;
   role: UserRole;
   clerkUserId: string; // for backward-compatibility with older route handlers
+  email?: string;
+  displayName?: string;
 }
 
 export interface ProviderAuthContext {
   userId: string;
   role: "provider" | "admin";
   clerkUserId: string;
+  email?: string;
+  displayName?: string;
 }
 
 export function isNextResponse(value: unknown): value is NextResponse {
@@ -41,11 +45,15 @@ export async function getPatientAuth(
 
   const token = bearerToken || cookieToken;
   let uid: string | null = null;
+  let tokenEmail: string | undefined = undefined;
+  let tokenDisplayName: string | undefined = undefined;
 
   if (token) {
     const decoded = await verifyFirebaseIdToken(token);
     if (decoded?.uid) {
       uid = decoded.uid;
+      tokenEmail = decoded.email;
+      tokenDisplayName = decoded.displayName;
     }
   }
 
@@ -114,6 +122,8 @@ export async function getPatientAuth(
     patientId: String(patientId),
     clerkUserId: uid,
     role: "patient",
+    email: tokenEmail,
+    displayName: tokenDisplayName,
   };
 }
 
@@ -128,9 +138,16 @@ export async function getProviderAuth(
   const token = bearerToken || cookieToken;
 
   let uid: string | null = null;
+  let tokenEmail: string | undefined = undefined;
+  let tokenDisplayName: string | undefined = undefined;
+
   if (token) {
     const decoded = await verifyFirebaseIdToken(token);
-    if (decoded?.uid) uid = decoded.uid;
+    if (decoded?.uid) {
+      uid = decoded.uid;
+      tokenEmail = decoded.email;
+      tokenDisplayName = decoded.displayName;
+    }
   }
 
   if (!uid) {
@@ -148,5 +165,7 @@ export async function getProviderAuth(
     userId: uid,
     clerkUserId: uid,
     role: "provider",
+    email: tokenEmail,
+    displayName: tokenDisplayName,
   };
 }

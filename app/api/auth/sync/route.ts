@@ -134,10 +134,10 @@ export async function POST(request: NextRequest) {
     // 4. Upsert user record into Supabase public.profiles using service role client
     const supabase = getSupabaseAdminClient();
 
-    // Check if profile already exists to preserve created_at and last_report_sent_at
+    // Check if profile already exists in profiles
     const { data: existingProfile, error: fetchError } = await supabase
       .from("profiles")
-      .select("id, created_at, last_report_sent_at, onboarding_complete, latitude, longitude, city, region, country, location_updated_at")
+      .select("id, created_at, last_report_sent_at, onboarding_complete, conditions, display_name, latitude, longitude, city, region, country, location_updated_at")
       .eq("id", firebaseUid)
       .maybeSingle();
 
@@ -145,16 +145,33 @@ export async function POST(request: NextRequest) {
       console.warn("[auth:sync] Supabase lookup warning:", fetchError.message);
     }
 
+    // Also check patient_profiles for existing conditions and onboarding status
+    const { data: existingPatient } = await supabase
+      .from("patient_profiles")
+      .select("conditions, onboarding_complete, name")
+      .eq("user_id", firebaseUid)
+      .maybeSingle();
+
+    const profileConditions = Array.isArray(existingProfile?.conditions) ? existingProfile.conditions : [];
+    const patientConditions = Array.isArray(existingPatient?.conditions) ? existingPatient.conditions : [];
+    const mergedConditions = profileConditions.length > 0 ? profileConditions : patientConditions;
+    const isCompleted = Boolean(
+      existingProfile?.onboarding_complete ||
+      existingPatient?.onboarding_complete ||
+      mergedConditions.length > 0
+    );
+
     const now = new Date().toISOString();
     const profilePayload: Record<string, any> = {
       id: firebaseUid,
       email: userEmail,
-      display_name: displayName,
+      display_name: displayName || existingProfile?.display_name || existingPatient?.name || "Patient",
       photo_url: photoUrl,
       updated_at: now,
       created_at: existingProfile?.created_at || now,
       last_report_sent_at: existingProfile?.last_report_sent_at ?? null,
-      onboarding_complete: existingProfile?.onboarding_complete ?? false,
+      onboarding_complete: isCompleted,
+      conditions: mergedConditions,
       latitude: resolvedLatitude !== null ? resolvedLatitude : (existingProfile?.latitude ?? null),
       longitude: resolvedLongitude !== null ? resolvedLongitude : (existingProfile?.longitude ?? null),
       city: resolvedCity !== null ? resolvedCity : (existingProfile?.city ?? null),
@@ -178,22 +195,22 @@ export async function POST(request: NextRequest) {
       finalProfile = upsertedProfile;
     }
 
-    // Also sync to legacy patient_profiles if needed for existing table relations
+    // Also sync to patient_profiles while strictly PRESERVING existing conditions
     try {
       await supabase
         .from("patient_profiles")
         .upsert(
           {
             user_id: firebaseUid,
-            name: displayName,
+            name: profilePayload.display_name,
             date_of_birth: "1990-01-01",
-            conditions: [],
-            onboarding_complete: finalProfile?.onboarding_complete ?? false,
+            conditions: mergedConditions,
+            onboarding_complete: isCompleted,
           },
           { onConflict: "user_id" }
         );
-    } catch {
-      // Non-fatal legacy sync
+    } catch (e: any) {
+      console.warn("[auth:sync] patient_profiles sync warning:", e?.message || e);
     }
 
     // 5. Set session cookie for Next.js middleware and API routes

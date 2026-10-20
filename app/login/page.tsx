@@ -1,30 +1,61 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import TurnstileWidget from "@/components/security/TurnstileWidget";
-import { ShieldCheck, Activity, Heart, ArrowRight, AlertCircle, Loader2, Sparkles } from "lucide-react";
+import { ShieldCheck, Activity, Heart, ArrowRight, AlertCircle, Loader2, Sparkles, CheckCircle2 } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
   const { user, profile, loading, signInWithGoogle, signInWithRedirectFlow, turnstileToken, setTurnstileToken } = useAuth();
   const [authError, setAuthError] = useState<string | null>(null);
   const [isSigningIn, setIsSigningIn] = useState(false);
+  const redirectingRef = useRef(false);
+  const [accountDeletedBanner, setAccountDeletedBanner] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("deleted") === "true") {
+        setAccountDeletedBanner(true);
+      }
+    }
+  }, []);
 
   const resolveTarget = (prof?: typeof profile) => {
+    if (!prof) return "/onboarding";
     const hasCompleted = Boolean(
-      prof?.onboarding_complete ||
-      (Array.isArray(prof?.conditions) && prof.conditions.length > 0)
+      prof.onboarding_complete ||
+      (Array.isArray(prof.conditions) && prof.conditions.length > 0)
     );
     return hasCompleted ? "/dashboard" : "/onboarding";
   };
 
   useEffect(() => {
-    if (!loading && user) {
-      const destination = resolveTarget(profile);
-      window.location.href = destination;
+    if (loading) return;
+    if (user && !redirectingRef.current) {
+      if (profile) {
+        redirectingRef.current = true;
+        const destination = resolveTarget(profile);
+        window.location.replace(destination);
+        return;
+      }
+      // If user state is ready but profile hasn't loaded yet, fetch session to avoid false onboarding redirect
+      fetch("/api/auth/session")
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (redirectingRef.current) return;
+          redirectingRef.current = true;
+          const destination = resolveTarget(data?.user);
+          window.location.replace(destination);
+        })
+        .catch(() => {
+          if (redirectingRef.current) return;
+          redirectingRef.current = true;
+          window.location.replace("/onboarding");
+        });
     }
   }, [user, profile, loading]);
 
@@ -33,13 +64,27 @@ export default function LoginPage() {
     setIsSigningIn(true);
     try {
       const result = await signInWithGoogle(turnstileToken || undefined);
-      if (result?.user) {
+      // If popup triggered a redirect fallback, result is null while page redirects
+      if (!result) return;
+
+      if (result.user) {
         const destination = resolveTarget(result.profile);
         window.location.href = destination;
       }
     } catch (err: any) {
       console.error("Sign in failed:", err);
-      if (err.message?.includes("api-key-not-valid") || err.code === "auth/api-key-not-valid") {
+      if (
+        err.code === "auth/popup-blocked" ||
+        err.message?.includes("popup-blocked") ||
+        err.code === "auth/cancelled-popup-request"
+      ) {
+        setAuthError("Popup was blocked by your browser. Redirecting you to secure Google sign-in...");
+        try {
+          await signInWithRedirectFlow();
+        } catch {
+          setAuthError("Failed to initiate redirect sign-in. Please click 'Sign in via full-page redirect' below.");
+        }
+      } else if (err.message?.includes("api-key-not-valid") || err.code === "auth/api-key-not-valid") {
         setAuthError("Firebase API key is not yet configured in .env.local. Click 'One-Click Test Account' below to explore the live application.");
       } else {
         setAuthError(err.message || "Failed to complete Google Sign-In. Please try again.");
@@ -125,6 +170,16 @@ export default function LoginPage() {
             </p>
           </div>
 
+          {accountDeletedBanner && (
+            <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 flex items-start gap-2.5 text-xs text-emerald-800 dark:text-emerald-200 animate-fade-in">
+              <CheckCircle2 size={16} className="shrink-0 text-emerald-600 dark:text-emerald-400 mt-0.5" />
+              <div className="space-y-0.5">
+                <p className="font-semibold text-emerald-900 dark:text-emerald-100">Account & Data Permanently Deleted</p>
+                <p>All biometric readings, medication history, journal entries, and personal records have been completely purged from the database in compliance with the DPDP Act 2023.</p>
+              </div>
+            </div>
+          )}
+
           {authError && (
             <div className="p-3 rounded-xl bg-accent-coral/10 border border-accent-coral/20 flex items-start gap-2.5 text-xs text-accent-coral animate-shake">
               <AlertCircle size={16} className="shrink-0 mt-0.5" />
@@ -174,11 +229,12 @@ export default function LoginPage() {
 
             {/* Alternative redirect button for mobile browser compatibility */}
             <button
+              type="button"
               onClick={handleRedirectSignIn}
               disabled={isSigningIn}
-              className="w-full text-center text-[11px] text-text-tertiary hover:text-accent-violet transition-colors py-1"
+              className="w-full text-center text-xs text-text-secondary hover:text-accent-violet transition-colors py-2 px-3 rounded-xl bg-bg-light/80 hover:bg-bg-lavender/50 border border-divider/60 font-medium"
             >
-              Having popup issues? Sign in via full-page redirect →
+              📱 Mobile browser or popup blocked? Use redirect sign-in →
             </button>
 
             <div className="relative my-2 pt-1">

@@ -37,6 +37,14 @@ export default function TurnstileWidget({
   const [widgetId, setWidgetId] = useState<string | null>(null);
   const [isRendered, setIsRendered] = useState(false);
 
+  const onVerifyRef = useRef(onVerify);
+  onVerifyRef.current = onVerify;
+
+  const onErrorRef = useRef(onError);
+  onErrorRef.current = onError;
+
+  const renderedRef = useRef(false);
+
   // Official Cloudflare testing sitekey (Always Passes)
   const siteKey =
     process.env.NEXT_PUBLIC_CLOUDFLARE_TURNSTILE_SITE_KEY ||
@@ -46,21 +54,21 @@ export default function TurnstileWidget({
     let isMounted = true;
 
     const renderWidget = () => {
-      if (!containerRef.current || !window.turnstile || isRendered) return;
+      if (!containerRef.current || !window.turnstile || renderedRef.current) return;
 
       try {
+        renderedRef.current = true;
         const id = window.turnstile.render(containerRef.current, {
           sitekey: siteKey,
           theme: theme,
           callback: (token: string) => {
-            if (isMounted) onVerify(token);
+            if (isMounted) onVerifyRef.current(token);
           },
           "error-callback": (err: any) => {
             console.warn("[turnstile] Widget error:", err);
-            if (onError && isMounted) onError(String(err));
-            // In dev environment, provide fallback valid test token
-            if (process.env.NODE_ENV !== "production") {
-              onVerify("test_turnstile_token");
+            if (onErrorRef.current && isMounted) onErrorRef.current(String(err));
+            if (process.env.NODE_ENV !== "production" && isMounted) {
+              onVerifyRef.current("test_turnstile_token");
             }
           },
         });
@@ -70,8 +78,8 @@ export default function TurnstileWidget({
         }
       } catch (e: any) {
         console.warn("[turnstile] Render error:", e);
-        if (process.env.NODE_ENV !== "production") {
-          onVerify("test_turnstile_token");
+        if (process.env.NODE_ENV !== "production" && isMounted) {
+          onVerifyRef.current("test_turnstile_token");
         }
       }
     };
@@ -79,7 +87,6 @@ export default function TurnstileWidget({
     if (window.turnstile) {
       renderWidget();
     } else {
-      // Check if script is already in document
       let script = document.getElementById("cloudflare-turnstile-script") as HTMLScriptElement | null;
       if (!script) {
         script = document.createElement("script");
@@ -99,11 +106,10 @@ export default function TurnstileWidget({
 
       const timeout = setTimeout(() => {
         clearInterval(checkInterval);
-        if (!isRendered && process.env.NODE_ENV !== "production") {
-          // Dev fallback token if script blocked by ad-blocker
-          onVerify("test_turnstile_token");
+        if (!renderedRef.current && process.env.NODE_ENV !== "production" && isMounted) {
+          onVerifyRef.current("test_turnstile_token");
         }
-      }, 3000);
+      }, 2500);
 
       return () => {
         isMounted = false;
@@ -115,7 +121,7 @@ export default function TurnstileWidget({
     return () => {
       isMounted = false;
     };
-  }, [siteKey, theme, isRendered, onVerify, onError]);
+  }, [siteKey, theme]);
 
   return (
     <div className={`flex flex-col items-center justify-center my-3 ${className}`}>

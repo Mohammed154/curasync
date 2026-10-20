@@ -77,6 +77,16 @@ export async function POST(request: NextRequest) {
       const { eq } = await import("drizzle-orm");
       const recDate = new Date(recordedAt);
 
+      // 0. Ensure user exists in profiles to satisfy vitals_user_id_fkey constraint
+      await db
+        .insert(profiles)
+        .values({
+          id: authCtx.userId,
+          email: authCtx.email || `${authCtx.userId}@curasync.care`,
+          displayName: authCtx.displayName || "Patient",
+        })
+        .onConflictDoNothing();
+
       // 1. Insert into public.vitals table (user_id is TEXT referencing public.profiles(id))
       const [insertedVital] = await db.insert(vitals).values({
         userId:     authCtx.userId,

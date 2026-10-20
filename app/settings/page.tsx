@@ -4,7 +4,8 @@ import React, { useState } from "react";
 import AppShell, { SafeSignOutButton } from "@/components/layout/AppShell";
 import {
   User, Bell, Shield, MapPin, Download, Trash2, ChevronRight,
-  Moon, Globe, LogOut, Lock, FileText, Smartphone, Loader2
+  Moon, Globe, LogOut, Lock, FileText, Smartphone, Loader2,
+  AlertTriangle, ShieldAlert, X
 } from "lucide-react";
 import { clsx } from "clsx";
 import { requestPdfExport } from "@/hooks/useApi";
@@ -34,8 +35,17 @@ export default function SettingsPage() {
   });
   const [pdfDownloadsToday, setPdfDownloadsToday] = useState(1); // max 5/day
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportingCsv, setExportingCsv] = useState(false);
   const [updatingLocation, setUpdatingLocation] = useState(false);
   const [locationStatus, setLocationStatus] = useState<string | null>(null);
+
+  // Deletion modal state
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const { user, profile, updateLocation, signOut } = useAuth();
 
   const handleExportPdf = async () => {
     if (exportingPdf || pdfDownloadsToday >= 5) return;
@@ -51,6 +61,73 @@ export default function SettingsPage() {
     }
   };
 
+  const handleExportCsv = async () => {
+    if (exportingCsv) return;
+    setExportingCsv(true);
+    try {
+      const res = await fetch("/api/v1/export?format=csv");
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || `Export failed with status ${res.status}`);
+      }
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const today = new Date().toISOString().split("T")[0];
+      a.download = `curasync-health-data-${today}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err: any) {
+      console.error("CSV export error:", err);
+      alert(err.message || "Failed to download CSV data export. Please try again.");
+    } finally {
+      setExportingCsv(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmText.trim() !== "DELETE" || isDeleting) return;
+    setIsDeleting(true);
+    setDeleteError(null);
+    try {
+      const res = await fetch("/api/v1/account", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirmation: "DELETE" }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to delete account. Please try again.");
+      }
+
+      // Clear local storage and session items
+      if (typeof window !== "undefined") {
+        try {
+          window.localStorage.removeItem("curasync_user_location");
+          window.sessionStorage.clear();
+        } catch {}
+      }
+
+      // Clear client auth state
+      try {
+        await signOut();
+      } catch (e) {
+        console.warn("Client signout warning:", e);
+      }
+
+      // Hard redirect to login page with notification
+      window.location.href = "/login?deleted=true";
+    } catch (err: any) {
+      console.error("Account deletion error:", err);
+      setDeleteError(err.message || "An unexpected error occurred while deleting your account.");
+      setIsDeleting(false);
+    }
+  };
+
   const toggle = (key: keyof typeof toggles) =>
     setToggles((prev) => ({ ...prev, [key]: !prev[key] }));
 
@@ -62,7 +139,6 @@ export default function SettingsPage() {
     { key: "data",         label: "My Data & Export",       icon: Download,  description: "Download, delete, export options" },
   ];
 
-  const { user, profile, updateLocation } = useAuth();
   const displayName = user?.displayName || profile?.display_name || "Patient";
   const email = user?.email || profile?.email || "patient@curasync.care";
   const initials = displayName
@@ -321,22 +397,44 @@ export default function SettingsPage() {
                         </button>
                       </div>
 
-                      <button className="w-full flex items-center gap-3 py-3 px-3 rounded-lg border border-divider hover:bg-bg-light transition-all text-left">
-                        <FileText size={16} className="text-text-secondary flex-shrink-0" aria-hidden="true" />
+                      <button
+                        onClick={handleExportCsv}
+                        disabled={exportingCsv}
+                        className="w-full flex items-center gap-3 py-3 px-3 rounded-lg border border-divider hover:bg-bg-light transition-all text-left disabled:opacity-60"
+                      >
+                        {exportingCsv ? (
+                          <Loader2 size={16} className="text-accent-violet animate-spin flex-shrink-0" aria-hidden="true" />
+                        ) : (
+                          <FileText size={16} className="text-text-secondary flex-shrink-0" aria-hidden="true" />
+                        )}
                         <div className="flex-1">
-                          <p className="text-label-sm font-semibold text-text-primary">Export all data (CSV)</p>
+                          <p className="text-label-sm font-semibold text-text-primary">
+                            {exportingCsv ? "Preparing CSV Export..." : "Export all data (CSV)"}
+                          </p>
                           <p className="text-xs text-text-tertiary">All readings, medications, and journal entries</p>
                         </div>
-                        <ChevronRight size={14} className="text-text-tertiary" />
+                        {exportingCsv ? (
+                          <span className="text-xs text-accent-violet font-medium animate-pulse">Exporting...</span>
+                        ) : (
+                          <ChevronRight size={14} className="text-text-tertiary" />
+                        )}
                       </button>
 
                       <div className="pt-2 border-t border-divider">
-                        <button className="w-full flex items-center gap-3 py-3 px-3 rounded-lg hover:bg-red-50 transition-all text-left group">
+                        <button
+                          onClick={() => {
+                            setDeleteConfirmText("");
+                            setDeleteError(null);
+                            setShowDeleteModal(true);
+                          }}
+                          className="w-full flex items-center gap-3 py-3 px-3 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 transition-all text-left group"
+                        >
                           <Trash2 size={16} className="text-status-red flex-shrink-0" aria-hidden="true" />
                           <div className="flex-1">
                             <p className="text-label-sm font-semibold text-status-red">Delete my account & all data</p>
                             <p className="text-xs text-text-tertiary">Permanent — cannot be undone. DPDP right to erasure.</p>
                           </div>
+                          <ChevronRight size={14} className="text-text-tertiary group-hover:text-status-red transition-colors" />
                         </button>
                       </div>
                     </div>
@@ -360,6 +458,133 @@ export default function SettingsPage() {
 
         <div className="h-8" />
       </div>
+
+      {/* Delete Confirmation Modal (DPDP Act 2023 Right to Erasure / HIPAA Compliance) */}
+      {showDeleteModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-modal-title"
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in"
+        >
+          <div className="bg-bg-card rounded-2xl max-w-lg w-full border border-status-red/40 shadow-2xl overflow-hidden p-6 space-y-5 animate-scale-in">
+            {/* Modal Header */}
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-red-100 dark:bg-red-950/60 border border-red-200 dark:border-red-900/60 flex items-center justify-center text-status-red shadow-sm flex-shrink-0">
+                  <AlertTriangle size={26} className="text-status-red animate-pulse" />
+                </div>
+                <div>
+                  <h3 id="delete-modal-title" className="text-title-md font-bold text-text-primary">
+                    Delete Account & All Data
+                  </h3>
+                  <p className="text-xs text-status-red font-medium flex items-center gap-1.5 mt-0.5">
+                    <ShieldAlert size={14} />
+                    Permanent & Irreversible Right to Erasure
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!isDeleting) {
+                    setShowDeleteModal(false);
+                    setDeleteConfirmText("");
+                    setDeleteError(null);
+                  }
+                }}
+                disabled={isDeleting}
+                className="text-text-tertiary hover:text-text-primary p-1 rounded-lg hover:bg-bg-light transition-colors disabled:opacity-50"
+                aria-label="Close dialog"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Warning Details Callout */}
+            <div className="p-4 rounded-xl bg-red-50/80 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 space-y-2.5 text-xs text-text-secondary">
+              <p className="font-semibold text-text-primary">
+                ⚠️ Warning: Deleting your account will thoroughly and permanently erase each and every detail from the database:
+              </p>
+              <ul className="list-disc pl-4 space-y-1 text-text-secondary">
+                <li>All blood pressure, heart rate, oxygen, & vital biometric readings</li>
+                <li>Continuous & capillary glucose logs, meal context, & stats</li>
+                <li>Active medication regimens, dosage schedules, & adherence history</li>
+                <li>Health journal entries, symptom notes, severity, & mood logs</li>
+                <li>Care team connections, doctor consultations, & tele-visit rooms</li>
+                <li>Monthly PDF summary reports & emergency contact profiles</li>
+                <li>Authentication credentials & active security sessions</li>
+              </ul>
+              <p className="font-bold text-status-red pt-1 border-t border-red-200/60 dark:border-red-900/40">
+                This action is immediate and CANNOT be undone. No recovery is possible once deleted.
+              </p>
+            </div>
+
+            {/* Type DELETE Input */}
+            <div className="space-y-2">
+              <label htmlFor="confirm-delete-input" className="block text-xs font-semibold text-text-primary">
+                To confirm permanent deletion, please type{" "}
+                <span className="font-mono font-bold text-status-red bg-red-100 dark:bg-red-900/40 px-1.5 py-0.5 rounded">
+                  DELETE
+                </span>{" "}
+                below:
+              </label>
+              <input
+                id="confirm-delete-input"
+                type="text"
+                value={deleteConfirmText}
+                onChange={(e) => setDeleteConfirmText(e.target.value)}
+                placeholder="Type DELETE to confirm"
+                autoComplete="off"
+                disabled={isDeleting}
+                className="w-full px-3.5 py-2.5 rounded-lg border border-divider focus:border-status-red focus:ring-2 focus:ring-status-red/20 text-sm font-mono tracking-wider outline-none transition-all disabled:opacity-50"
+              />
+            </div>
+
+            {/* Error Message */}
+            {deleteError && (
+              <div className="p-3 rounded-lg bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 text-xs text-status-red flex items-center gap-2">
+                <AlertTriangle size={15} className="shrink-0" />
+                <span>{deleteError}</span>
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setDeleteConfirmText("");
+                  setDeleteError(null);
+                }}
+                disabled={isDeleting}
+                className="px-4 py-2.5 rounded-lg border border-divider text-text-secondary text-label-sm font-semibold hover:bg-bg-light transition-all disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteAccount}
+                disabled={deleteConfirmText.trim() !== "DELETE" || isDeleting}
+                className="px-4 py-2.5 rounded-lg bg-status-red text-white text-label-sm font-semibold hover:bg-red-600 transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm"
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 size={15} className="animate-spin" />
+                    <span>Permanently Erasing Data...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 size={15} />
+                    <span>Permanently Delete Everything</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </AppShell>
   );
 }

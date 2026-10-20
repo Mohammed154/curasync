@@ -165,12 +165,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (redirectUser) {
           setUser(redirectUser);
           const syncedProfile = await syncUserToSupabase(redirectUser);
-          if (typeof window !== "undefined" && window.location.pathname === "/login") {
+          if (typeof window !== "undefined") {
             const hasCompleted = Boolean(
               syncedProfile?.onboarding_complete ||
               (Array.isArray(syncedProfile?.conditions) && syncedProfile.conditions.length > 0)
             );
-            window.location.href = hasCompleted ? "/dashboard" : "/onboarding";
+            const path = window.location.pathname;
+            if (path === "/login" || path === "/onboarding" || path === "/") {
+              window.location.href = hasCompleted ? "/dashboard" : "/onboarding";
+            }
           }
         }
       })
@@ -197,7 +200,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signInWithGoogle = async (turnstile?: string): Promise<SignInResult | null> => {
     setLoading(true);
     try {
-      const signedInUser = await signInWithGooglePopup();
+      let signedInUser: User;
+      try {
+        signedInUser = await signInWithGooglePopup();
+      } catch (popupErr: any) {
+        // Automatic graceful fallback to redirect flow if popup is blocked on mobile or desktop
+        if (
+          popupErr.code === "auth/popup-blocked" ||
+          popupErr.code === "auth/cancelled-popup-request" ||
+          popupErr.message?.includes("popup-blocked")
+        ) {
+          console.warn("[auth-context] Popup blocked by browser. Seamlessly initiating redirect flow...");
+          await signInWithGoogleRedirect();
+          return null;
+        }
+        throw popupErr;
+      }
+
       setUser(signedInUser);
       const syncedProfile = await syncUserToSupabase(signedInUser, turnstile || turnstileToken || undefined);
       return {

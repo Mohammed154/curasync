@@ -89,6 +89,7 @@ export const patientProfiles = pgTable("patient_profiles", {
   dateOfBirth:      date("date_of_birth").notNull(),
   conditions:       text("conditions").array().notNull().default(sql`'{}'`),
   emergencyContact: jsonb("emergency_contact"),
+  onboardingComplete: boolean("onboarding_complete").default(false),
   createdAt:        timestamp("created_at", { withTimezone: true }).defaultNow(),
   updatedAt:        timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });

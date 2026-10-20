@@ -15,13 +15,58 @@ const CHECKLIST = [
 
 export default function OnboardingCompletePage() {
   const [visible, setVisible] = useState(false);
-  const { refreshProfile } = useAuth();
+  const { profile, refreshProfile } = useAuth();
+  const [conditionCount, setConditionCount] = useState<number>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const stored = window.sessionStorage.getItem("curasync_conditions");
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed)) return parsed.length;
+        }
+      } catch {
+        // ignore
+      }
+    }
+    return 1;
+  });
 
   useEffect(() => {
     const t = setTimeout(() => setVisible(true), 100);
-    refreshProfile().catch(() => {});
+
+    // Explicitly persist onboarding completion status
+    const completeOnboarding = async () => {
+      try {
+        let conditionsToSave: string[] = [];
+        if (typeof window !== "undefined") {
+          try {
+            const raw = window.sessionStorage.getItem("curasync_conditions");
+            if (raw) conditionsToSave = JSON.parse(raw);
+          } catch {}
+        }
+
+        if (conditionsToSave.length > 0) {
+          setConditionCount(conditionsToSave.length);
+          await fetch("/api/v1/onboarding", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              name: profile?.display_name || "Patient",
+              dateOfBirth: "1990-01-01",
+              conditions: conditionsToSave,
+            }),
+          });
+        }
+      } catch (e) {
+        console.warn("[onboarding-complete] Completion sync:", e);
+      } finally {
+        await refreshProfile().catch(() => {});
+      }
+    };
+
+    completeOnboarding();
     return () => clearTimeout(t);
-  }, [refreshProfile]);
+  }, [profile, refreshProfile]);
 
   return (
     <div className="min-h-screen gradient-dark flex flex-col items-center justify-center px-4 py-10">
@@ -45,7 +90,7 @@ export default function OnboardingCompletePage() {
             You&apos;re all set!
           </h1>
           <p className="text-white/60 text-sm leading-relaxed">
-            CuraSync is now configured for your 3 conditions. Your dashboard is ready with live metrics and personalised alerts.
+            CuraSync is now configured for your {conditionCount} {conditionCount === 1 ? "condition" : "conditions"}. Your dashboard is ready with live metrics and personalised alerts.
           </p>
         </div>
 

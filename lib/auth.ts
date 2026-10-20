@@ -70,33 +70,80 @@ export async function getPatientAuth(
   }
 
   let patientId: string | null = null;
+  const userEmail = tokenEmail || `${uid}@curasync.care`;
+  let resolvedDisplayName = tokenDisplayName || "Patient";
 
   try {
-    // 1. Direct query to patient_profiles in Postgres
+    // 1. Ensure profiles record exists for user_id (required by vitals, glucose_readings, reports)
+    const [existingProfile] = await db
+      .select({
+        id: profiles.id,
+        email: profiles.email,
+        displayName: profiles.displayName,
+        conditions: profiles.conditions,
+        onboardingComplete: profiles.onboardingComplete,
+      })
+      .from(profiles)
+      .where(eq(profiles.id, uid))
+      .limit(1);
+
+    if (existingProfile) {
+      if (existingProfile.displayName) {
+        resolvedDisplayName = existingProfile.displayName;
+      }
+    } else {
+      await db
+        .insert(profiles)
+        .values({
+          id: uid,
+          email: userEmail,
+          displayName: resolvedDisplayName,
+          onboardingComplete: false,
+          conditions: [],
+        })
+        .onConflictDoNothing();
+    }
+
+    // 2. Direct query to patient_profiles in Postgres
     const [existingPatient] = await db
-      .select({ id: patientProfiles.id })
+      .select({
+        id: patientProfiles.id,
+        conditions: patientProfiles.conditions,
+        name: patientProfiles.name,
+      })
       .from(patientProfiles)
       .where(eq(patientProfiles.userId, uid))
       .limit(1);
 
     if (existingPatient?.id) {
       patientId = existingPatient.id;
-    } else {
-      // 2. Lookup profile display name if available
-      const [existingProfile] = await db
-        .select({ displayName: profiles.displayName })
-        .from(profiles)
-        .where(eq(profiles.id, uid))
-        .limit(1);
 
-      // Create new patient_profiles entry
+      // Bidirectional sync: if patient_profiles has conditions but profiles doesn't, sync to profiles
+      if (
+        Array.isArray(existingPatient.conditions) &&
+        existingPatient.conditions.length > 0 &&
+        (!existingProfile?.conditions || existingProfile.conditions.length === 0)
+      ) {
+        await db
+          .update(profiles)
+          .set({
+            conditions: existingPatient.conditions,
+            onboardingComplete: true,
+            updatedAt: new Date(),
+          })
+          .where(eq(profiles.id, uid))
+          .catch(() => {});
+      }
+    } else {
+      const initialConditions = Array.isArray(existingProfile?.conditions) ? existingProfile.conditions : [];
       const [newPatient] = await db
         .insert(patientProfiles)
         .values({
           userId: uid,
-          name: existingProfile?.displayName || "Patient",
+          name: existingProfile?.displayName || resolvedDisplayName,
           dateOfBirth: "1990-01-01",
-          conditions: [],
+          conditions: initialConditions,
+          onboardingComplete: Boolean(existingProfile?.onboardingComplete || initialConditions.length > 0),
         })
         .onConflictDoUpdate({
           target: patientProfiles.userId,
@@ -122,8 +169,8 @@ export async function getPatientAuth(
     patientId: String(patientId),
     clerkUserId: uid,
     role: "patient",
-    email: tokenEmail,
-    displayName: tokenDisplayName,
+    email: userEmail,
+    displayName: resolvedDisplayName,
   };
 }
 

@@ -64,6 +64,7 @@ export async function POST(request: NextRequest) {
           dateOfBirth,
           conditions,
           emergencyContact: emergencyContact ?? null,
+          onboardingComplete: true,
           updatedAt: new Date(),
         })
         .where(eq(patientProfiles.userId, authCtx.clerkUserId))
@@ -79,19 +80,22 @@ export async function POST(request: NextRequest) {
           dateOfBirth,
           conditions,
           emergencyContact: emergencyContact ?? null,
+          onboardingComplete: true,
         })
         .returning();
       profile = inserted;
     }
 
-    // Also update Supabase public.profiles so onboarding_complete is permanently true
+    // Also update Supabase public.profiles with email to satisfy NOT NULL constraint
     try {
+      const userEmail = authCtx.email || `${authCtx.userId}@curasync.care`;
       const supabase = getSupabaseAdminClient();
       await supabase
         .from("profiles")
         .upsert(
           {
             id: authCtx.userId,
+            email: userEmail,
             display_name: name,
             date_of_birth: dateOfBirth,
             conditions: conditions,

@@ -159,7 +159,7 @@ export default function OnboardingMedicationsPage() {
         </div>
 
         <Link
-          href="/onboarding/devices"
+          href="/onboarding/location"
           className="block w-full text-center text-label-sm text-text-tertiary mt-3 hover:text-text-secondary transition-colors"
         >
           Skip — I&apos;ll add these later

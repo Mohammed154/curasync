@@ -3,6 +3,7 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "./schema";
+import * as partitionedSchema from "./partitioned-schema";
 
 declare global {
   // eslint-disable-next-line no-var
@@ -56,6 +57,8 @@ if (process.env.NODE_ENV !== "production") {
   global._pgClient = client;
 }
 
-export const db = drizzle(client, { schema });
+const fullSchema = { ...schema, ...partitionedSchema };
+export const db = drizzle(client, { schema: fullSchema });
 
 export * from "./schema";
+export * from "./partitioned-schema";

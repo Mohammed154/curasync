@@ -13,8 +13,43 @@ import {
   date,
   jsonb,
   check,
+  pgEnum,
 } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
+
+// ─── Enums ─────────────────────────────────────────────────────────────────────
+
+export const readingSourceEnum = pgEnum("reading_source", [
+  "manual",
+  "apple_health",
+  "fitbit",
+  "garmin",
+  "ble",
+]);
+
+export const readingTypeEnum = pgEnum("reading_type", [
+  "blood_glucose",
+  "blood_pressure_systolic",
+  "blood_pressure_diastolic",
+  "heart_rate",
+  "hrv",
+  "spo2",
+  "weight",
+  "hba1c",
+  "egfr",
+  "cholesterol_ldl",
+  "cholesterol_hdl",
+  "steps",
+  "sleep_hours",
+  "body_temp",
+  "peak_flow",
+]);
+
+export const userRoleEnum = pgEnum("user_role", [
+  "patient",
+  "provider",
+  "admin",
+]);
 
 // ─── profiles (Firebase synced users) ─────────────────────────────────────────
 
@@ -87,28 +122,21 @@ export const reports = pgTable("reports", {
 
 export const patientProfiles = pgTable("patient_profiles", {
   id:               uuid("id").primaryKey().defaultRandom(),
-  userId:           text("user_id").notNull().unique(),       // User ID
+  userId:           text("user_id").notNull().unique("patient_profiles_user_id_key"),       // User ID
   name:             text("name").notNull(),
   dateOfBirth:      date("date_of_birth").notNull(),
+  gender:           text("gender"),
+  phone:            text("phone"),
   conditions:       text("conditions").array().notNull().default(sql`'{}'`),
   emergencyContact: jsonb("emergency_contact"),
+  baselineValues:   jsonb("baseline_values"),
+  preferredUnits:   jsonb("preferred_units"),
+  language:         text("language").default("en"),
   onboardingComplete: boolean("onboarding_complete").default(false),
   createdAt:        timestamp("created_at", { withTimezone: true }).defaultNow(),
   updatedAt:        timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
 
-// ─── readings (TimescaleDB hypertable on recorded_at) ─────────────────────────
-
-export const readings = pgTable("readings", {
-  id:         uuid("id").defaultRandom(),
-  patientId:  uuid("patient_id").notNull().references(() => patientProfiles.id, { onDelete: "cascade" }),
-  type:       text("type").notNull(),
-  value:      numeric("value").notNull(),
-  unit:       text("unit").notNull(),
-  source:     text("source").notNull(),
-  recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull(),
-  notes:      text("notes"),
-});
 
 // ─── medications ──────────────────────────────────────────────────────────────
 
@@ -149,6 +177,7 @@ export const medicationLogs = pgTable("medication_logs", {
 export const alertEvents = pgTable("alert_events", {
   id:             uuid("id").primaryKey().defaultRandom(),
   patientId:      uuid("patient_id").notNull().references(() => patientProfiles.id, { onDelete: "cascade" }),
+  readingId:      uuid("reading_id"),
   severity:       text("severity").notNull(),
   status:         text("status").notNull().default("active"),
   type:           text("type").notNull(),
@@ -157,6 +186,7 @@ export const alertEvents = pgTable("alert_events", {
   threshold:      numeric("threshold"),
   triggeredAt:    timestamp("triggered_at", { withTimezone: true }).defaultNow(),
   acknowledgedAt: timestamp("acknowledged_at", { withTimezone: true }),
+  acknowledgedBy: uuid("acknowledged_by"),
 });
 
 // ─── journal_entries ──────────────────────────────────────────────────────────
@@ -169,8 +199,13 @@ export const journalEntries = pgTable("journal_entries", {
   conditionId:   text("condition_id").notNull(),
   bodyLocation:  text("body_location"),
   contextTags:   text("context_tags").array(),
+  symptoms:      text("symptoms").array().default(sql`'{}'`),
+  notes:         text("notes"),
+  mood:          text("mood"),
+  loggedAt:      timestamp("logged_at", { withTimezone: true }).defaultNow(),
   recordedAt:    timestamp("recorded_at", { withTimezone: true }).defaultNow(),
   editableUntil: timestamp("editable_until", { withTimezone: true }).notNull(),
+  createdAt:     timestamp("created_at", { withTimezone: true }).defaultNow(),
 });
 
 // ─── messages ─────────────────────────────────────────────────────────────────
@@ -201,7 +236,7 @@ export const providerPatients = pgTable("provider_patients", {
 
 export const inviteCodes = pgTable("invite_codes", {
   id:         uuid("id").primaryKey().defaultRandom(),
-  code:       text("code").notNull().unique(),
+  code:       text("code").notNull().unique("invite_codes_code_key"),
   providerId: text("provider_id").notNull(),
   patientId:  uuid("patient_id").references(() => patientProfiles.id),
   expiresAt:  timestamp("expires_at", { withTimezone: true }).notNull(),
@@ -258,7 +293,6 @@ export const followUpReminders = pgTable("follow_up_reminders", {
 // ─── Relations ────────────────────────────────────────────────────────────────
 
 export const patientRelations = relations(patientProfiles, ({ many }) => ({
-  readings:          many(readings),
   medications:       many(medications),
   medicationLogs:    many(medicationLogs),
   alertEvents:       many(alertEvents),
@@ -294,8 +328,6 @@ export type Report              = typeof reports.$inferSelect;
 export type NewReport           = typeof reports.$inferInsert;
 export type PatientProfile      = typeof patientProfiles.$inferSelect;
 export type NewPatientProfile    = typeof patientProfiles.$inferInsert;
-export type Reading             = typeof readings.$inferSelect;
-export type NewReading          = typeof readings.$inferInsert;
 export type Medication          = typeof medications.$inferSelect;
 export type NewMedication       = typeof medications.$inferInsert;
 export type MedicationLog       = typeof medicationLogs.$inferSelect;

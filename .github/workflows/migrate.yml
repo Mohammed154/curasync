@@ -4,14 +4,14 @@ on:
   push:
     branches: [main]
     paths:
-      - "lib/db/schema.ts"   # only runs when schema changes
+      - "lib/db/schema.ts" # only runs when schema changes
 
 jobs:
   migrate:
     name: Push Drizzle Schema
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    environment: production   # requires manual approval in GitHub Environments
+    environment: production # requires manual approval in GitHub Environments
 
     steps:
       - name: Checkout
@@ -30,6 +30,5 @@ jobs:
         run: npx drizzle-kit push --config=drizzle.config.ts
         env:
           # Use the DIRECT Supabase connection (port 5432) for migrations
-          # Falls back to DATABASE_URL if DATABASE_URL_DIRECT is not set
-          DATABASE_URL_DIRECT: ${{ secrets.DATABASE_URL_DIRECT || secrets.DATABASE_URL }}
-          DATABASE_URL: ${{ secrets.DATABASE_URL_DIRECT || secrets.DATABASE_URL }}
+          # NOT the pooler (port 6543) — drizzle-kit requires a direct connection
+          DATABASE_URL: ${{ secrets.DATABASE_URL_DIRECT }}

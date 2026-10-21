@@ -54,7 +54,7 @@ export default function DashboardPage() {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       if (params.get("error") === "unauthorized_provider_access") {
-        setUnauthorizedMessage("Access Restricted: Your account does not have clinical provider or doctor privileges. You have been redirected to your patient dashboard.");
+        setUnauthorizedMessage("Access restricted: Clinical provider credentials required. You have been redirected to your patient dashboard.");
       }
     }
   }, []);

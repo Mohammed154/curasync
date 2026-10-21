@@ -60,7 +60,7 @@ export default function SignUpPage() {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       const returnTo = params.get("returnTo") || params.get("redirect");
-      if (returnTo) return returnTo;
+      if (returnTo && returnTo !== "/onboarding") return returnTo;
     }
     return "/dashboard";
   };

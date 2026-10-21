@@ -66,17 +66,36 @@ export default function LoginPage() {
   };
 
   const resolveTarget = (prof?: typeof profile) => {
+    let explicitReturn: string | null = null;
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       const returnTo = params.get("returnTo") || params.get("redirect");
-      if (returnTo) return returnTo;
+      // Query parameter hygiene: strip stale fallback parameters that default to /onboarding
+      if (returnTo && returnTo !== "/onboarding") {
+        explicitReturn = returnTo;
+      }
     }
-    if (!prof) return "/onboarding";
-    const hasCompleted = Boolean(
-      prof.onboarding_complete ||
-      (Array.isArray(prof.conditions) && prof.conditions.length > 0)
-    );
-    return hasCompleted ? "/dashboard" : "/onboarding";
+
+    if (prof) {
+      if (prof.role === "provider" || prof.role === "doctor" || prof.role === "admin") {
+        return explicitReturn || "/provider/dashboard";
+      }
+
+      const hasCompleted = Boolean(
+        prof.onboarding_complete ||
+        (Array.isArray(prof.conditions) && prof.conditions.length > 0)
+      );
+
+      // Returning patients must never be redirected to /onboarding
+      if (hasCompleted) {
+        return explicitReturn || "/dashboard";
+      }
+
+      return "/onboarding";
+    }
+
+    // If profile is not yet available, default to dashboard rather than onboarding
+    return explicitReturn || "/dashboard";
   };
 
   useEffect(() => {
@@ -96,7 +115,7 @@ export default function LoginPage() {
             window.location.replace(destination);
           })
           .catch(() => {
-            window.location.replace("/onboarding");
+            window.location.replace("/dashboard");
           });
       });
     }

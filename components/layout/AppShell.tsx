@@ -34,10 +34,11 @@ const PATIENT_NAV: NavItem[] = [
 ];
 
 const PROVIDER_NAV: NavItem[] = [
-  { label: "Patient Panel",  href: "/provider",             icon: Stethoscope },
+  { label: "Dashboard",      href: "/provider/dashboard",   icon: LayoutDashboard },
+  { label: "Patient Panel",  href: "/provider/patients",    icon: Stethoscope },
   { label: "Telehealth",     href: "/provider/telehealth",  icon: Video },
   { label: "Invite Patient", href: "/provider/invite",      icon: UserPlus },
-  { label: "Alerts",         href: "/alerts",               icon: Bell },
+  { label: "Alerts",         href: "/provider/alerts",      icon: Bell },
   { label: "Settings",       href: "/settings",             icon: Settings },
 ];
 
@@ -45,18 +46,23 @@ interface SafeSignOutButtonProps {
   children: React.ReactNode;
   onClick?: () => void;
   className?: string;
+  redirectTo?: string;
 }
 
 export function SafeSignOutButton({
   children,
   onClick,
-  className
+  className,
+  redirectTo,
 }: SafeSignOutButtonProps) {
   const { signOut } = useAuth();
 
   const handleSignOut = async () => {
     if (onClick) onClick();
     await signOut();
+    if (redirectTo && typeof window !== "undefined") {
+      window.location.href = redirectTo;
+    }
   };
 
   return (
@@ -254,20 +260,23 @@ export default function AppShell({
                 <span>Profile & Settings</span>
               </Link>
 
-              <Link
-                href="/conditions"
-                onClick={() => {
-                  setSidebarProfileOpen(false);
-                  setSidebarOpen(false);
-                }}
-                className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-text-secondary hover:bg-bg-lavender hover:text-text-primary transition-all text-xs font-medium"
-              >
-                <Heart size={15} className="text-text-tertiary" />
-                <span>My Conditions</span>
-              </Link>
+              {role === "patient" && (
+                <Link
+                  href="/conditions"
+                  onClick={() => {
+                    setSidebarProfileOpen(false);
+                    setSidebarOpen(false);
+                  }}
+                  className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-text-secondary hover:bg-bg-lavender hover:text-text-primary transition-all text-xs font-medium"
+                >
+                  <Heart size={15} className="text-text-tertiary" />
+                  <span>My Conditions</span>
+                </Link>
+              )}
 
               <div className="border-t border-divider pt-1 mt-1">
                 <SafeSignOutButton
+                  redirectTo={role === "provider" ? "/provider/login" : "/login"}
                   onClick={() => {
                     setSidebarProfileOpen(false);
                     setSidebarOpen(false);
@@ -346,19 +355,6 @@ export default function AppShell({
             </div>
           )}
 
-          {/* Role switcher (MVP demo only) */}
-          <div className="mt-6 pt-4 border-t border-divider">
-            <p className="text-xs font-semibold text-text-tertiary uppercase tracking-widest px-3 mb-3">
-              Demo
-            </p>
-            <Link
-              href={role === "patient" ? "/provider" : "/dashboard"}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-text-secondary hover:bg-bg-lavender hover:text-accent-violet transition-all text-label-sm font-medium"
-            >
-              <Stethoscope size={17} strokeWidth={2} className="text-text-tertiary" />
-              Switch to {role === "patient" ? "Provider" : "Patient"} view
-            </Link>
-          </div>
         </nav>
 
         {/* Bottom actions */}
@@ -370,7 +366,10 @@ export default function AppShell({
             <Settings size={17} strokeWidth={2} className="text-text-tertiary" />
             Settings
           </Link>
-          <SafeSignOutButton className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-text-secondary hover:bg-status-red-bg hover:text-status-red transition-all text-label-sm font-medium">
+          <SafeSignOutButton
+            redirectTo={role === "provider" ? "/provider/login" : "/login"}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-text-secondary hover:bg-status-red-bg hover:text-status-red transition-all text-label-sm font-medium"
+          >
             <LogOut size={17} strokeWidth={2} />
             Sign out
           </SafeSignOutButton>
@@ -564,18 +563,21 @@ export default function AppShell({
                         <Settings size={15} className="text-text-tertiary" />
                         Settings
                       </Link>
-                      <Link
-                        href="/conditions"
-                        onClick={closeProfile}
-                        className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-text-secondary hover:bg-bg-lavender hover:text-text-primary transition-all text-xs font-medium"
-                      >
-                        <Heart size={15} className="text-text-tertiary" />
-                        My Conditions
-                      </Link>
+                      {role === "patient" && (
+                        <Link
+                          href="/conditions"
+                          onClick={closeProfile}
+                          className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-text-secondary hover:bg-bg-lavender hover:text-text-primary transition-all text-xs font-medium"
+                        >
+                          <Heart size={15} className="text-text-tertiary" />
+                          My Conditions
+                        </Link>
+                      )}
                     </div>
 
                     <div className="border-t border-divider p-1.5 bg-status-red-bg/10">
                       <SafeSignOutButton
+                        redirectTo={role === "provider" ? "/provider/login" : "/login"}
                         onClick={closeProfile}
                         className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-status-red hover:bg-status-red-bg transition-all text-xs font-semibold"
                       >

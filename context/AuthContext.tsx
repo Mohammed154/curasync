@@ -10,6 +10,7 @@ import {
   onAuthStateChanged,
   User,
 } from "@/lib/firebase/client";
+import { getSupabaseBrowserClient } from "@/lib/supabase";
 
 export interface UserProfile {
   id: string;
@@ -169,13 +170,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(redirectUser);
           const syncedProfile = await syncUserToSupabase(redirectUser);
           if (typeof window !== "undefined") {
+            const isProvider = syncedProfile?.role === "provider" || syncedProfile?.role === "doctor" || syncedProfile?.role === "admin";
             const hasCompleted = Boolean(
               syncedProfile?.onboarding_complete ||
               (Array.isArray(syncedProfile?.conditions) && syncedProfile.conditions.length > 0)
             );
             const path = window.location.pathname;
-            if (path === "/login" || path === "/onboarding" || path === "/") {
-              window.location.href = hasCompleted ? "/dashboard" : "/onboarding";
+            if (path === "/login" || path === "/") {
+              window.location.href = isProvider ? "/provider/dashboard" : (hasCompleted ? "/dashboard" : "/onboarding");
             }
           }
         }
@@ -246,6 +248,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     try {
+      try {
+        const supabase = getSupabaseBrowserClient();
+        await supabase.auth.signOut();
+      } catch (e) {
+        // ignore
+      }
       await signOutFirebase();
       await fetch("/api/auth/session", { method: "DELETE" });
       setUser(null);

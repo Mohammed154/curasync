@@ -93,11 +93,11 @@ export default function ProviderPatientDetailPage({ params }: Props) {
             </p>
           </div>
           <Link
-            href="/provider"
+            href="/provider/dashboard"
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl gradient-violet text-white font-semibold text-label-sm shadow-card hover:opacity-90 transition-opacity"
           >
             <ArrowLeft size={16} />
-            <span>Return to Patient Panel</span>
+            <span>Return to Clinical Dashboard</span>
           </Link>
         </div>
       </AppShell>
@@ -110,7 +110,7 @@ export default function ProviderPatientDetailPage({ params }: Props) {
         {/* Header */}
         <div className="flex items-start gap-3">
           <Link
-            href="/provider"
+            href="/provider/dashboard"
             className="w-9 h-9 rounded-xl flex items-center justify-center bg-bg-card border border-divider shadow-card hover:bg-bg-lavender transition-colors flex-shrink-0 mt-1"
           >
             <ArrowLeft size={16} className="text-text-secondary" />

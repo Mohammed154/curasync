@@ -208,11 +208,39 @@ export async function getProviderAuth(
     );
   }
 
-  return {
-    userId: uid,
-    clerkUserId: uid,
-    role: "provider",
-    email: tokenEmail,
-    displayName: tokenDisplayName,
-  };
+  // Verify that the user has a clinician or admin role
+  try {
+    const [profile] = await db
+      .select({
+        role: profiles.role,
+        displayName: profiles.displayName,
+        email: profiles.email,
+      })
+      .from(profiles)
+      .where(eq(profiles.id, uid))
+      .limit(1);
+
+    const userRole = profile?.role || "patient";
+    if (userRole !== "provider" && userRole !== "doctor" && userRole !== "admin") {
+      return NextResponse.json(
+        { success: false, error: "Forbidden — provider or clinician role required", code: "FORBIDDEN" },
+        { status: 403 }
+      );
+    }
+
+    return {
+      userId: uid,
+      clerkUserId: uid,
+      role: userRole as "provider" | "admin",
+      email: tokenEmail || profile?.email,
+      displayName: tokenDisplayName || profile?.displayName || "Provider",
+    };
+  } catch (err) {
+    console.warn("[auth] Database check in getProviderAuth warning:", err);
+    // If DB check fails, default to strict 403 for security
+    return NextResponse.json(
+      { success: false, error: "Forbidden — unable to verify provider role", code: "FORBIDDEN" },
+      { status: 403 }
+    );
+  }
 }

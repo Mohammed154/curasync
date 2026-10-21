@@ -27,6 +27,9 @@ export interface UserProfile {
   region?: string | null;
   country?: string | null;
   location_updated_at?: string | null;
+  has_seen_welcome?: boolean;
+  weekly_digest_enabled?: boolean;
+  role?: string;
 }
 
 export interface SignInResult {

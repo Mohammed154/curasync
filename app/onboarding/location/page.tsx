@@ -40,12 +40,18 @@ export default function OnboardingLocationPage() {
         setDetectedCoords(coords);
         setStatusMessage(`Latitude ${coords.latitude.toFixed(4)}, Longitude ${coords.longitude.toFixed(4)}`);
         
-        // Persist to backend and context
-        await updateLocation({
-          latitude: coords.latitude,
-          longitude: coords.longitude,
-          accuracy: coords.accuracy,
-        });
+        if (typeof window !== "undefined") {
+          window.sessionStorage.setItem("curasync_onboarding_location", JSON.stringify(coords));
+        }
+
+        // Persist to backend and context if authenticated
+        if (user) {
+          await updateLocation({
+            latitude: coords.latitude,
+            longitude: coords.longitude,
+            accuracy: coords.accuracy,
+          });
+        }
       } else {
         // Non-blocking fallback
         setStatusMessage("Permission not granted. Passive regional location will be used.");

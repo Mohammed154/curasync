@@ -97,8 +97,12 @@ export const VITAL_METADATA: Record<string, VitalDisplayMeta> = {
     label: "Kidney eGFR",
     unit: "mL/min",
     icon: "🧪",
-    getValue: () => "--",
-    getStatus: () => "green",
+    getValue: (r) => (r.egfr != null ? String(r.egfr) : "--"),
+    getStatus: (r) => {
+      const v = r.egfr;
+      if (v == null) return "green";
+      return v < 30 ? "red" : v < 60 ? "amber" : "green";
+    },
   },
   hba1c: {
     key: "hba1c",

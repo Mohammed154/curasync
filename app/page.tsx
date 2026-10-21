@@ -5,7 +5,7 @@ import Link from "next/link";
 import Aurora from "@/components/ui/Aurora";
 import {
   Heart, Activity, Pill, MessageSquare, Brain,
-  Watch, Shield, ChevronRight, CheckCircle2,
+  Watch, Shield, CheckCircle2,
   ArrowRight, Zap, BarChart3, Bell, Video,
 } from "lucide-react";
 import { clsx } from "clsx";
@@ -262,7 +262,7 @@ export default function HomePage() {
             <span style={{ fontWeight: 700, fontSize: 18, color: "#fff" }}>CuraSync</span>
           </div>
           <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-            <Link href="/dashboard" style={{ color: "rgba(255,255,255,0.6)", fontSize: 14, fontWeight: 500, textDecoration: "none" }}>
+            <Link href="/login" style={{ color: "rgba(255,255,255,0.6)", fontSize: 14, fontWeight: 500, textDecoration: "none" }}>
               Sign in
             </Link>
             <Link href="/onboarding" style={{
@@ -308,15 +308,6 @@ export default function HomePage() {
               textDecoration: "none", boxShadow: "0 8px 32px rgba(108,92,231,0.4)",
             }}>
               Start for Free <ArrowRight size={18} />
-            </Link>
-            <Link href="/dashboard" style={{
-              display: "inline-flex", alignItems: "center", gap: 8,
-              padding: "14px 28px", borderRadius: 99, fontWeight: 600, fontSize: 16,
-              background: "rgba(255,255,255,0.09)", color: "rgba(255,255,255,0.75)",
-              border: "1px solid rgba(255,255,255,0.18)", textDecoration: "none",
-              backdropFilter: "blur(8px)",
-            }}>
-              View Demo
             </Link>
           </div>
 
@@ -404,9 +395,6 @@ export default function HomePage() {
                 </li>
               ))}
             </ul>
-            <Link href="/provider" style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "10px 20px", borderRadius: 99, fontSize: 14, fontWeight: 600, color: "#fff", border: "1px solid rgba(255,255,255,0.2)", background: "rgba(255,255,255,0.07)", textDecoration: "none" }}>
-              See Provider Dashboard <ChevronRight size={15} />
-            </Link>
           </div>
 
           {/* Mock patient panel card */}
@@ -461,9 +449,6 @@ export default function HomePage() {
           <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap", marginBottom: 32 }}>
             <Link href="/onboarding" style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "14px 32px", borderRadius: 99, fontWeight: 700, fontSize: 16, background: "linear-gradient(135deg,#6C5CE7,#A29BFE)", color: "#fff", textDecoration: "none", boxShadow: "0 8px 32px rgba(108,92,231,0.4)" }}>
               Start for Free <Zap size={17} />
-            </Link>
-            <Link href="/dashboard" style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "14px 32px", borderRadius: 99, fontWeight: 600, fontSize: 16, background: "rgba(255,255,255,0.09)", color: "rgba(255,255,255,0.7)", border: "1px solid rgba(255,255,255,0.18)", textDecoration: "none" }}>
-              Explore Demo
             </Link>
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 20, fontSize: 12, color: "rgba(255,255,255,0.3)" }}>

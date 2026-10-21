@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import TurnstileWidget from "@/components/security/TurnstileWidget";
-import { ShieldCheck, Activity, Heart, ArrowRight, AlertCircle, Loader2, Sparkles, CheckCircle2 } from "lucide-react";
+import { ShieldCheck, Activity, Heart, ArrowRight, AlertCircle, Loader2, CheckCircle2 } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -24,7 +24,53 @@ export default function LoginPage() {
     }
   }, []);
 
+  const persistPendingOnboarding = async (userObj: { uid: string; displayName?: string | null; email?: string | null }) => {
+    if (typeof window === "undefined") return;
+    try {
+      const rawPayload = window.sessionStorage.getItem("curasync_onboarding_payload");
+      const rawConditions =
+        window.sessionStorage.getItem("curasync_conditions") ||
+        window.sessionStorage.getItem("curasync_onboarding_conditions");
+      const rawBaselines = window.sessionStorage.getItem("curasync_onboarding_baselines");
+      const rawMeds = window.sessionStorage.getItem("curasync_onboarding_medications");
+
+      if (rawPayload || rawConditions || rawBaselines || rawMeds) {
+        const parsedPayload = rawPayload ? JSON.parse(rawPayload) : {};
+        const conditions = parsedPayload.conditions || (rawConditions ? JSON.parse(rawConditions) : []);
+        const baselines = parsedPayload.baselines || (rawBaselines ? JSON.parse(rawBaselines) : {});
+        const medications = parsedPayload.medications || (rawMeds ? JSON.parse(rawMeds) : []);
+
+        await fetch("/api/v1/onboarding", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: userObj.displayName || "Patient",
+            dateOfBirth: "1990-01-01",
+            conditions: Array.isArray(conditions) && conditions.length > 0 ? conditions : ["diabetes_t2"],
+            baselines,
+            medications,
+          }),
+        });
+
+        // Purge sessionStorage onboarding keys once write succeeds
+        window.sessionStorage.removeItem("curasync_onboarding_payload");
+        window.sessionStorage.removeItem("curasync_conditions");
+        window.sessionStorage.removeItem("curasync_onboarding_conditions");
+        window.sessionStorage.removeItem("curasync_onboarding_baselines");
+        window.sessionStorage.removeItem("curasync_onboarding_medications");
+        window.sessionStorage.removeItem("curasync_onboarding_demographics");
+      }
+    } catch (e) {
+      console.warn("[login] Error saving pending onboarding data:", e);
+    }
+  };
+
   const resolveTarget = (prof?: typeof profile) => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const returnTo = params.get("returnTo") || params.get("redirect");
+      if (returnTo) return returnTo;
+    }
     if (!prof) return "/onboarding";
     const hasCompleted = Boolean(
       prof.onboarding_complete ||
@@ -36,26 +82,23 @@ export default function LoginPage() {
   useEffect(() => {
     if (loading) return;
     if (user && !redirectingRef.current) {
-      if (profile) {
-        redirectingRef.current = true;
-        const destination = resolveTarget(profile);
-        window.location.replace(destination);
-        return;
-      }
-      // If user state is ready but profile hasn't loaded yet, fetch session to avoid false onboarding redirect
-      fetch("/api/auth/session")
-        .then((res) => (res.ok ? res.json() : null))
-        .then((data) => {
-          if (redirectingRef.current) return;
-          redirectingRef.current = true;
-          const destination = resolveTarget(data?.user);
+      redirectingRef.current = true;
+      persistPendingOnboarding(user).finally(() => {
+        if (profile) {
+          const destination = resolveTarget(profile);
           window.location.replace(destination);
-        })
-        .catch(() => {
-          if (redirectingRef.current) return;
-          redirectingRef.current = true;
-          window.location.replace("/onboarding");
-        });
+          return;
+        }
+        fetch("/api/auth/session")
+          .then((res) => (res.ok ? res.json() : null))
+          .then((data) => {
+            const destination = resolveTarget(data?.user);
+            window.location.replace(destination);
+          })
+          .catch(() => {
+            window.location.replace("/onboarding");
+          });
+      });
     }
   }, [user, profile, loading]);
 
@@ -64,10 +107,10 @@ export default function LoginPage() {
     setIsSigningIn(true);
     try {
       const result = await signInWithGoogle(turnstileToken || undefined);
-      // If popup triggered a redirect fallback, result is null while page redirects
       if (!result) return;
 
       if (result.user) {
+        await persistPendingOnboarding(result.user);
         const destination = resolveTarget(result.profile);
         window.location.href = destination;
       }
@@ -85,7 +128,7 @@ export default function LoginPage() {
           setAuthError("Failed to initiate redirect sign-in. Please click 'Sign in via full-page redirect' below.");
         }
       } else if (err.message?.includes("api-key-not-valid") || err.code === "auth/api-key-not-valid") {
-        setAuthError("Firebase API key is not yet configured in .env.local. Click 'One-Click Test Account' below to explore the live application.");
+        setAuthError("Authentication service is temporarily unavailable. Please verify client environment configuration.");
       } else {
         setAuthError(err.message || "Failed to complete Google Sign-In. Please try again.");
       }
@@ -101,29 +144,7 @@ export default function LoginPage() {
       await signInWithRedirectFlow();
     } catch (err: any) {
       console.error("Redirect sign in failed:", err);
-      if (err.message?.includes("api-key-not-valid") || err.code === "auth/api-key-not-valid") {
-        setAuthError("Firebase API key is not yet configured in .env.local. Click 'One-Click Test Account' below to explore the live application.");
-      } else {
-        setAuthError(err.message || "Redirect authentication failed.");
-      }
-      setIsSigningIn(false);
-    }
-  };
-
-  const handleDevLogin = async () => {
-    setIsSigningIn(true);
-    setAuthError(null);
-    try {
-      const res = await fetch("/api/auth/dev-login", { method: "POST" });
-      if (res.ok) {
-        window.location.href = "/dashboard";
-      } else {
-        const data = await res.json().catch(() => ({}));
-        setAuthError(data.error || "Failed to create test session");
-      }
-    } catch (e: any) {
-      setAuthError(e.message || "Failed to initialize test account");
-    } finally {
+      setAuthError(err.message || "Redirect authentication failed.");
       setIsSigningIn(false);
     }
   };
@@ -235,24 +256,6 @@ export default function LoginPage() {
               className="w-full text-center text-xs text-text-secondary hover:text-accent-violet transition-colors py-2 px-3 rounded-xl bg-bg-light/80 hover:bg-bg-lavender/50 border border-divider/60 font-medium"
             >
               📱 Mobile browser or popup blocked? Use redirect sign-in →
-            </button>
-
-            <div className="relative my-2 pt-1">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t border-divider" />
-              </div>
-              <div className="relative flex justify-center text-[10px] uppercase">
-                <span className="bg-bg-card px-2 text-text-tertiary font-semibold tracking-wider">or live demo</span>
-              </div>
-            </div>
-
-            <button
-              onClick={handleDevLogin}
-              disabled={isSigningIn}
-              className="w-full py-2.5 px-4 rounded-xl bg-bg-light hover:bg-bg-lavender text-accent-violet font-semibold text-xs border border-accent-lavender/50 flex items-center justify-center gap-2 transition-all hover:border-accent-violet shadow-xs active:scale-[0.99]"
-            >
-              <Sparkles size={14} />
-              <span>One-Click Test Account Sign In</span>
             </button>
           </div>
 

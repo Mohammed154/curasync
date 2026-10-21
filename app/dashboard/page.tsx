@@ -22,9 +22,10 @@ import { RefreshCw, PlusCircle, ChevronDown, ChevronUp, Video, MapPin, CheckCirc
 import { getBrowserLocation } from "@/lib/location";
 import { useDoctorConnection } from "@/hooks/useDoctorConnection";
 import DoctorConnectionModal from "@/components/telehealth/DoctorConnectionModal";
+import WelcomeModal from "@/components/modals/WelcomeModal";
 
 export default function DashboardPage() {
-  const { user, profile, updateLocation } = useAuth();
+  const { user, profile, refreshProfile, updateLocation } = useAuth();
 
   // ── SWR Live Data Hooks ──────────────────────────────────────────────────
   const { data: readingsData, mutate: mutateReadings, isValidating: isReadingsValidating } = useReadings(undefined, 100);
@@ -39,11 +40,54 @@ export default function DashboardPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [logModalOpen, setLogModalOpen] = useState(false);
   const [showMoreWidgets, setShowMoreWidgets] = useState(false);
+  const [welcomeModalOpen, setWelcomeModalOpen] = useState(false);
 
   // Polite Geolocation banner on first dashboard access
   const [showLocationBanner, setShowLocationBanner] = useState(false);
   const [locationLoading, setLocationLoading] = useState(false);
   const [locationSuccess, setLocationSuccess] = useState<string | null>(null);
+
+  // Check for unauthorized provider access redirect
+  const [unauthorizedMessage, setUnauthorizedMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("error") === "unauthorized_provider_access") {
+        setUnauthorizedMessage("Access Restricted: Your account does not have clinical provider or doctor privileges. You have been redirected to your patient dashboard.");
+      }
+    }
+  }, []);
+
+  // First-time patient welcome dialog check
+  useEffect(() => {
+    if (!user) return;
+    const localKey = `curasync_has_seen_welcome_${user.uid}`;
+    const alreadySeenLocal = typeof window !== "undefined" && window.localStorage.getItem(localKey) === "true";
+
+    if (!alreadySeenLocal && profile && profile.has_seen_welcome !== true) {
+      setWelcomeModalOpen(true);
+    }
+  }, [user, profile]);
+
+  const handleDismissWelcome = async () => {
+    setWelcomeModalOpen(false);
+    if (!user) return;
+    const localKey = `curasync_has_seen_welcome_${user.uid}`;
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(localKey, "true");
+    }
+    try {
+      await fetch("/api/v1/onboarding", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ has_seen_welcome: true }),
+      });
+      await refreshProfile();
+    } catch (err) {
+      console.warn("[dashboard] Error updating has_seen_welcome flag:", err);
+    }
+  };
 
   // Doctor connection & presence
   const {
@@ -147,6 +191,9 @@ export default function DashboardPage() {
           break;
         case "hba1c":
           base.hba1c = parseFloat(numVal.toFixed(1));
+          break;
+        case "egfr":
+          base.egfr = Math.round(numVal);
           break;
       }
     }
@@ -557,6 +604,23 @@ export default function DashboardPage() {
           </div>
         </div>
 
+        {/* ── Unauthorized Access Redirect Notice ────────────────────────── */}
+        {unauthorizedMessage && (
+          <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-xl p-3.5 flex items-center justify-between gap-3 text-sm animate-fade-in shadow-xs">
+            <div className="flex items-center gap-2.5">
+              <ShieldAlert size={18} className="text-amber-600 shrink-0" />
+              <span>{unauthorizedMessage}</span>
+            </div>
+            <button
+              onClick={() => setUnauthorizedMessage(null)}
+              className="text-amber-700 hover:text-amber-900 p-1 rounded-md hover:bg-amber-100 transition-colors"
+              aria-label="Dismiss message"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        )}
+
         {/* ── Polite Geolocation Permission Banner ────────────────────────── */}
         {showLocationBanner && (
           <div className="bg-gradient-to-r from-bg-lavender via-white to-bg-lavender/40 border border-accent-lavender rounded-2xl p-4 shadow-card flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 card-enter animate-fade-in">
@@ -816,6 +880,12 @@ export default function DashboardPage() {
           doctorName={doctorInfo.name}
           specialty={doctorInfo.specialty}
           onConnect={connectDoctor}
+        />
+
+        {/* ── First-time Patient Welcome Modal ─────────────────────────────── */}
+        <WelcomeModal
+          isOpen={welcomeModalOpen}
+          onDismiss={handleDismissWelcome}
         />
       </div>
     </AppShell>

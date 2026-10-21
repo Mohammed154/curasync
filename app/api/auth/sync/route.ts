@@ -137,7 +137,7 @@ export async function POST(request: NextRequest) {
     // Check if profile already exists in profiles
     const { data: existingProfile, error: fetchError } = await supabase
       .from("profiles")
-      .select("id, created_at, last_report_sent_at, onboarding_complete, conditions, display_name, latitude, longitude, city, region, country, location_updated_at")
+      .select("id, created_at, last_report_sent_at, onboarding_complete, conditions, display_name, latitude, longitude, city, region, country, location_updated_at, has_seen_welcome, weekly_digest_enabled, role")
       .eq("id", firebaseUid)
       .maybeSingle();
 
@@ -178,6 +178,8 @@ export async function POST(request: NextRequest) {
       region: resolvedRegion !== null ? resolvedRegion : (existingProfile?.region ?? null),
       country: resolvedCountry !== null ? resolvedCountry : (existingProfile?.country ?? null),
       location_updated_at: hasNewLocation ? now : (existingProfile?.location_updated_at ?? null),
+      has_seen_welcome: existingProfile?.has_seen_welcome ?? false,
+      role: existingProfile?.role || "patient",
     };
 
     let finalProfile: Record<string, any> = profilePayload;
@@ -243,6 +245,14 @@ export async function POST(request: NextRequest) {
     });
 
     response.cookies.set("curasync_uid", firebaseUid, {
+      httpOnly: false,
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24 * 7,
+    });
+
+    response.cookies.set("curasync_role", finalProfile.role || "patient", {
       httpOnly: false,
       secure: process.env.NODE_ENV === "production",
       path: "/",

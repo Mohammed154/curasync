@@ -141,3 +141,47 @@ export async function DELETE(request: NextRequest) {
     );
   }
 }
+
+export async function PATCH(request: NextRequest) {
+  const requestId = nanoid(12);
+
+  const authCtx = await getPatientAuth(request);
+  if (isNextResponse(authCtx)) return authCtx;
+
+  try {
+    const body = await request.json().catch(() => ({}));
+    const supabase = getSupabaseAdminClient();
+    const updatePayload: Record<string, any> = {
+      updated_at: new Date().toISOString(),
+    };
+
+    if (body.weekly_digest_enabled !== undefined) {
+      updatePayload.weekly_digest_enabled = Boolean(body.weekly_digest_enabled);
+    }
+
+    const { data, error } = await supabase
+      .from("profiles")
+      .update(updatePayload)
+      .eq("id", authCtx.userId)
+      .select()
+      .single();
+
+    if (error) {
+      return NextResponse.json(
+        { error: error.message, requestId },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      profile: data,
+      requestId,
+    });
+  } catch (err: any) {
+    return NextResponse.json(
+      { error: err.message || "Failed to update account preferences", requestId },
+      { status: 500 }
+    );
+  }
+}

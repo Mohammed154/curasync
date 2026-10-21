@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import AppShell, { SafeSignOutButton } from "@/components/layout/AppShell";
 import {
   User, Bell, Shield, MapPin, Download, Trash2, ChevronRight,
@@ -28,7 +28,6 @@ export default function SettingsPage() {
   const [toggles, setToggles] = useState({
     pushNotifications: true,
     emailDigest: true,
-    smsAlerts: true,
     biometricUnlock: false,
     largeText: false,
     shareWithProviders: true,
@@ -45,7 +44,17 @@ export default function SettingsPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  const { user, profile, updateLocation, signOut } = useAuth();
+  const { user, profile, updateLocation, refreshProfile, signOut } = useAuth();
+
+  // Sync email digest toggle with profile in Supabase
+  useEffect(() => {
+    if (profile?.weekly_digest_enabled !== undefined) {
+      setToggles((prev) => ({
+        ...prev,
+        emailDigest: profile.weekly_digest_enabled !== false,
+      }));
+    }
+  }, [profile?.weekly_digest_enabled]);
 
   const handleExportPdf = async () => {
     if (exportingPdf || pdfDownloadsToday >= 5) return;
@@ -128,12 +137,42 @@ export default function SettingsPage() {
     }
   };
 
-  const toggle = (key: keyof typeof toggles) =>
+  const handleToggleWeeklyDigest = async () => {
+    const newValue = !toggles.emailDigest;
+    // 1. Optimistic UI update
+    setToggles((prev) => ({ ...prev, emailDigest: newValue }));
+
+    // 2. Persist to Supabase
+    try {
+      const res = await fetch("/api/v1/account", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ weekly_digest_enabled: newValue }),
+      });
+      if (!res.ok) {
+        // Rollback on failure
+        setToggles((prev) => ({ ...prev, emailDigest: !newValue }));
+      } else {
+        await refreshProfile().catch(() => {});
+      }
+    } catch (err) {
+      console.error("[settings] Failed to update weekly digest preference:", err);
+      // Rollback on failure
+      setToggles((prev) => ({ ...prev, emailDigest: !newValue }));
+    }
+  };
+
+  const toggle = (key: keyof typeof toggles) => {
+    if (key === "emailDigest") {
+      void handleToggleWeeklyDigest();
+      return;
+    }
     setToggles((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
 
   const sections: { key: SectionKey; label: string; icon: React.ElementType; description: string }[] = [
     { key: "profile",       label: "Profile",               icon: User,      description: "Name, DOB, emergency contact" },
-    { key: "notifications", label: "Notifications",          icon: Bell,      description: "Push, SMS, email preferences" },
+    { key: "notifications", label: "Notifications",          icon: Bell,      description: "Push and email preferences" },
     { key: "location",      label: "Geographic Location",   icon: MapPin,    description: "Regional care detection & coordinates" },
     { key: "privacy",      label: "Privacy & Security",     icon: Shield,    description: "Data sharing, session, biometrics" },
     { key: "data",         label: "My Data & Export",       icon: Download,  description: "Download, delete, export options" },
@@ -244,7 +283,6 @@ export default function SettingsPage() {
                       {[
                         { id: "pushNotifications", label: "Push notifications", desc: "Medication reminders & alert updates" },
                         { id: "emailDigest", label: "Weekly email digest", desc: "Summary of your health week" },
-                        { id: "smsAlerts", label: "SMS for critical alerts", desc: "Twilio SMS when BP or glucose is critical" },
                       ].map((n) => (
                         <div key={n.id} className="flex items-center justify-between py-2 border-b border-divider last:border-0">
                           <div>

@@ -157,15 +157,16 @@ export interface DashboardData {
 }
 
 export interface LatestReadings {
-  bloodGlucose: number;
-  systolic: number;
-  diastolic: number;
-  heartRate: number;
-  spo2: number;
-  weight: number;
-  bodyTemp?: number;
-  steps?: number;
-  hba1c?: number;
+  bloodGlucose: number | null;
+  systolic: number | null;
+  diastolic: number | null;
+  heartRate: number | null;
+  spo2: number | null;
+  weight: number | null;
+  bodyTemp?: number | null;
+  steps?: number | null;
+  hba1c?: number | null;
+  egfr?: number | null;
   lastSyncedAt: string;
 }
 

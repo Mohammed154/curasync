@@ -19,13 +19,34 @@ import {
 import Link from "next/link";
 import { clsx } from "clsx";
 import { requestPdfExport } from "@/hooks/useApi";
+import { useAuth } from "@/context/AuthContext";
+import { useRouter } from "next/navigation";
 
 type SortKey = "alertCount" | "adherenceScore" | "name" | "lastActivityDate";
 type FilterStatus = "all" | "red" | "amber" | "green";
 
 export default function ProviderDashboardPage() {
+  const router = useRouter();
+  const { user, profile, loading: authLoading } = useAuth();
   const [allPatients, setAllPatients] = useState<ProviderPatientRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Client-side RBAC guard
+  useEffect(() => {
+    if (authLoading) return;
+
+    if (!user) {
+      router.replace("/provider/login?returnTo=/provider/dashboard");
+      return;
+    }
+
+    if (profile) {
+      const isProvider = profile.role === "provider" || profile.role === "doctor" || profile.role === "admin";
+      if (!isProvider) {
+        router.replace("/dashboard?error=unauthorized_provider_access");
+      }
+    }
+  }, [user, profile, authLoading, router]);
 
   const [search, setSearch]       = useState("");
   const [sortKey, setSortKey]     = useState<SortKey>("alertCount");

@@ -20,9 +20,13 @@ export default async function OnboardingLayout({
 
     let uid = uidCookie;
     if (sessionToken) {
-      const decoded = await verifyFirebaseIdToken(sessionToken);
-      if (decoded?.uid) {
-        uid = decoded.uid;
+      try {
+        const decoded = await verifyFirebaseIdToken(sessionToken);
+        if (decoded?.uid) {
+          uid = decoded.uid;
+        }
+      } catch {
+        // Fallback to uidCookie if token decode fails
       }
     }
 
@@ -34,11 +38,20 @@ export default async function OnboardingLayout({
         .eq("id", uid)
         .maybeSingle();
 
+      const { data: patientProfile } = await supabase
+        .from("patient_profiles")
+        .select("id, onboarding_complete, conditions")
+        .eq("user_id", uid)
+        .maybeSingle();
+
       const profileConditions = Array.isArray(profile?.conditions) ? profile.conditions : [];
+      const patientConditions = Array.isArray(patientProfile?.conditions) ? patientProfile.conditions : [];
 
       if (
         profile?.onboarding_complete === true ||
-        profileConditions.length > 0
+        patientProfile?.onboarding_complete === true ||
+        profileConditions.length > 0 ||
+        patientConditions.length > 0
       ) {
         serverAlreadyOnboarded = true;
       }

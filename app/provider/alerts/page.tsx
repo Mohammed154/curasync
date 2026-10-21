@@ -6,11 +6,32 @@ import { AlertTriangle, Bell, Check, Loader2, ArrowRight, ShieldAlert, CheckCirc
 import Link from "next/link";
 import { clsx } from "clsx";
 import type { Alert } from "@/types";
+import { useAuth } from "@/context/AuthContext";
+import { useRouter } from "next/navigation";
 
 export default function ProviderAlertsPage() {
+  const router = useRouter();
+  const { user, profile, loading: authLoading } = useAuth();
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filterSeverity, setFilterSeverity] = useState<"all" | "critical" | "high" | "medium" | "low">("all");
+
+  // Client-side RBAC guard
+  useEffect(() => {
+    if (authLoading) return;
+
+    if (!user) {
+      router.replace("/provider/login?returnTo=/provider/alerts");
+      return;
+    }
+
+    if (profile) {
+      const isProvider = profile.role === "provider" || profile.role === "doctor" || profile.role === "admin";
+      if (!isProvider) {
+        router.replace("/dashboard?error=unauthorized_provider_access");
+      }
+    }
+  }, [user, profile, authLoading, router]);
 
   const fetchAlerts = () => {
     setIsLoading(true);

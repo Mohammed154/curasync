@@ -24,6 +24,25 @@ import { useDoctorConnection } from "@/hooks/useDoctorConnection";
 import DoctorConnectionModal from "@/components/telehealth/DoctorConnectionModal";
 import WelcomeModal from "@/components/modals/WelcomeModal";
 
+import { useSearchParams } from "next/navigation";
+
+function UnauthorizedParamListener({
+  onUnauthorized,
+}: {
+  onUnauthorized: (msg: string) => void;
+}) {
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    const errorParam = searchParams?.get("error");
+    if (errorParam === "unauthorized_provider_access") {
+      onUnauthorized(
+        "Access restricted: Clinical provider credentials required. You have been redirected to your patient dashboard."
+      );
+    }
+  }, [searchParams, onUnauthorized]);
+  return null;
+}
+
 export default function DashboardPage() {
   const { user, profile, refreshProfile, updateLocation } = useAuth();
 
@@ -54,7 +73,9 @@ export default function DashboardPage() {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       if (params.get("error") === "unauthorized_provider_access") {
-        setUnauthorizedMessage("Access restricted: Clinical provider credentials required. You have been redirected to your patient dashboard.");
+        setUnauthorizedMessage(
+          "Access restricted: Clinical provider credentials required. You have been redirected to your patient dashboard."
+        );
       }
     }
   }, []);
@@ -525,6 +546,9 @@ export default function DashboardPage() {
 
   return (
     <AppShell alertCount={activeAlerts.length}>
+      <React.Suspense fallback={null}>
+        <UnauthorizedParamListener onUnauthorized={setUnauthorizedMessage} />
+      </React.Suspense>
       <div className="max-w-5xl mx-auto px-4 lg:px-6 py-6 space-y-6">
 
         {/* ── 1. Greeting Header ─────────────────────────────────────────── */}

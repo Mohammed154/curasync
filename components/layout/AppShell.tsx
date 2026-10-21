@@ -532,7 +532,7 @@ export default function AppShell({
                     profileOpen && "ring-2 ring-accent-lavender"
                   )}
                 >
-                  AM
+                  {initials}
                 </div>
 
                 {/* Profile Popover */}

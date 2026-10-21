@@ -39,9 +39,13 @@ export async function GET(request: NextRequest) {
       const uidCookie = cookieStore.get("curasync_uid")?.value;
 
       if (sessionToken) {
-        const decoded = await verifyFirebaseIdToken(sessionToken);
-        if (decoded?.uid) {
-          uid = decoded.uid;
+        try {
+          const decoded = await verifyFirebaseIdToken(sessionToken);
+          if (decoded?.uid) {
+            uid = decoded.uid;
+          }
+        } catch {
+          // Fallback to uidCookie
         }
       }
       if (!uid && uidCookie) {
@@ -65,13 +69,24 @@ export async function GET(request: NextRequest) {
       .eq("id", uid)
       .maybeSingle();
 
+    const { data: patientProfile } = await supabase
+      .from("patient_profiles")
+      .select("id, onboarding_complete, conditions")
+      .eq("user_id", uid)
+      .maybeSingle();
+
     if (profile?.role === "provider" || profile?.role === "doctor" || profile?.role === "admin") {
       return NextResponse.redirect(new URL(sanitizedReturnTo || "/provider/dashboard", origin));
     }
 
+    const profileConditions = Array.isArray(profile?.conditions) ? profile.conditions : [];
+    const patientConditions = Array.isArray(patientProfile?.conditions) ? patientProfile.conditions : [];
+    const mergedConditions = profileConditions.length > 0 ? profileConditions : patientConditions;
+
     const hasCompletedOnboarding = Boolean(
       profile?.onboarding_complete ||
-      (Array.isArray(profile?.conditions) && profile.conditions.length > 0)
+      patientProfile?.onboarding_complete ||
+      mergedConditions.length > 0
     );
 
     // If onboarding_completed === true: Immediately route them to /dashboard.

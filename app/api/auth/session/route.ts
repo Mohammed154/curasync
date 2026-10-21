@@ -20,11 +20,15 @@ export async function GET(request: NextRequest) {
   let decodedName: string | undefined;
 
   if (sessionToken) {
-    const decoded = await verifyFirebaseIdToken(sessionToken);
-    if (decoded?.uid) {
-      uid = decoded.uid;
-      decodedEmail = decoded.email;
-      decodedName = decoded.displayName;
+    try {
+      const decoded = await verifyFirebaseIdToken(sessionToken);
+      if (decoded?.uid) {
+        uid = decoded.uid;
+        decodedEmail = decoded.email;
+        decodedName = decoded.displayName;
+      }
+    } catch {
+      // Fallback to uidCookie if token decode fails
     }
   }
 
@@ -94,5 +98,6 @@ export async function DELETE() {
   const response = NextResponse.json({ success: true });
   response.cookies.delete("curasync_session");
   response.cookies.delete("curasync_uid");
+  response.cookies.delete("curasync_role");
   return response;
 }

@@ -30,5 +30,6 @@ jobs:
         run: npx drizzle-kit push --config=drizzle.config.ts
         env:
           # Use the DIRECT Supabase connection (port 5432) for migrations
-          # NOT the pooler (port 6543) — drizzle-kit requires a direct connection
-          DATABASE_URL: ${{ secrets.DATABASE_URL_DIRECT }}
+          # Falls back to DATABASE_URL if DATABASE_URL_DIRECT is not set
+          DATABASE_URL_DIRECT: ${{ secrets.DATABASE_URL_DIRECT || secrets.DATABASE_URL }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL_DIRECT || secrets.DATABASE_URL }}

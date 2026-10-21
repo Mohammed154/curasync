@@ -8,7 +8,7 @@
 
 import { describe, it, expect } from "vitest";
 import { NextRequest } from "next/server";
-import { middleware } from "../../middleware";
+import { proxy as middleware } from "../../proxy";
 
 function createMockRequest(
   url: string,

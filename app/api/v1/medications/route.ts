@@ -124,13 +124,31 @@ export async function POST(request: NextRequest) {
   try {
     const isPatientUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(authCtx.patientId);
     const isMedUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(parsedLog.data.medicationId);
+    const todayDateStr = new Date().toISOString().slice(0, 10);
+    const now = new Date();
+    const takenAt = parsedLog.data.status === "taken" ? now : null;
+
+    // Remove existing log for this medication on this date to ensure single authoritative status
+    if (isMedUuid) {
+      await db
+        .delete(medicationLogs)
+        .where(
+          and(
+            eq(medicationLogs.medicationId, parsedLog.data.medicationId as `${string}-${string}-${string}-${string}-${string}`),
+            eq(medicationLogs.scheduledDate, todayDateStr)
+          )
+        )
+        .catch(() => {});
+    }
 
     const [inserted] = await db.insert(medicationLogs).values({
       userId:        authCtx.userId,
       medicationId:  isMedUuid ? (parsedLog.data.medicationId as `${string}-${string}-${string}-${string}-${string}`) : undefined,
       patientId:     isPatientUuid ? (authCtx.patientId as `${string}-${string}-${string}-${string}-${string}`) : undefined,
       status:        parsedLog.data.status,
-      scheduledAt:   new Date(parsedLog.data.scheduledAt),
+      scheduledDate: todayDateStr,
+      scheduledAt:   new Date(parsedLog.data.scheduledAt || now),
+      takenAt:       takenAt,
       skippedReason: parsedLog.data.skippedReason,
     }).returning();
 
@@ -166,6 +184,7 @@ export async function GET(request: NextRequest) {
   if (isNextResponse(authCtx)) return authCtx;
 
   const patId = authCtx.patientId as `${string}-${string}-${string}-${string}-${string}`;
+  const todayDateStr = new Date().toISOString().slice(0, 10);
 
   try {
     const rows = await db
@@ -173,6 +192,34 @@ export async function GET(request: NextRequest) {
       .from(medications)
       .where(and(eq(medications.patientId, patId), eq(medications.active, true)))
       .orderBy(desc(medications.createdAt));
+
+    // Fetch today's dose logs for this patient
+    const todayLogs = await db
+      .select()
+      .from(medicationLogs)
+      .where(
+        and(
+          eq(medicationLogs.patientId, patId),
+          eq(medicationLogs.scheduledDate, todayDateStr)
+        )
+      )
+      .catch(() => []);
+
+    const logMap = new Map<string, typeof todayLogs[0]>();
+    for (const log of todayLogs) {
+      if (log.medicationId) {
+        logMap.set(log.medicationId, log);
+      }
+    }
+
+    const enrichedRows = rows.map((med) => {
+      const log = logMap.get(med.id);
+      return {
+        ...med,
+        status: log?.status || "pending",
+        takenAt: log?.takenAt ? log.takenAt.toISOString() : null,
+      };
+    });
 
     void writeAuditLog({
       actorId: authCtx.clerkUserId,
@@ -183,7 +230,7 @@ export async function GET(request: NextRequest) {
     });
 
     return NextResponse.json(
-      { data: rows, meta: { total: rows.length }, requestId, timestamp: new Date().toISOString() },
+      { data: enrichedRows, meta: { total: enrichedRows.length }, requestId, timestamp: new Date().toISOString() },
       { status: 200 }
     );
   } catch (err) {

@@ -617,13 +617,13 @@ export default function DashboardPage() {
               />
             </button>
 
-            {/* Log reading action */}
+            {/* Log vitals / lab result action */}
             <button
               onClick={() => setLogModalOpen(true)}
-              className="flex items-center gap-2 px-3.5 py-2 rounded-lg gradient-violet text-white text-label-sm font-semibold shadow-card hover:opacity-90 transition-opacity"
+              className="flex items-center gap-2 px-4 py-2 rounded-xl gradient-violet text-white text-label-sm font-semibold shadow-card hover:opacity-95 transition-all cursor-pointer active:scale-95"
             >
               <PlusCircle size={15} aria-hidden="true" />
-              <span>Log Reading</span>
+              <span>+ Log Vitals / Add Lab Result</span>
             </button>
           </div>
         </div>

@@ -21,7 +21,7 @@ interface SettingRow {
   danger?: boolean;
 }
 
-type SectionKey = "profile" | "notifications" | "location" | "privacy" | "data" | null;
+type SectionKey = "profile" | "notifications" | "location" | "data" | null;
 
 export default function SettingsPage() {
   const [expanded, setExpanded] = useState<SectionKey>("profile");
@@ -174,7 +174,6 @@ export default function SettingsPage() {
     { key: "profile",       label: "Profile",               icon: User,      description: "Name, DOB, emergency contact" },
     { key: "notifications", label: "Notifications",          icon: Bell,      description: "Push and email preferences" },
     { key: "location",      label: "Geographic Location",   icon: MapPin,    description: "Regional care detection & coordinates" },
-    { key: "privacy",      label: "Privacy & Security",     icon: Shield,    description: "Data sharing, session, biometrics" },
     { key: "data",         label: "My Data & Export",       icon: Download,  description: "Download, delete, export options" },
   ];
 
@@ -217,7 +216,7 @@ export default function SettingsPage() {
         {/* Header */}
         <div className="mb-6 animate-fade-in">
           <h1 className="font-bold text-display text-text-primary">Settings</h1>
-          <p className="text-body-md text-text-secondary mt-1">Account, privacy, devices & preferences</p>
+          <p className="text-body-md text-text-secondary mt-1">Account, notifications, location & data preferences</p>
         </div>
 
         {/* Profile card */}
@@ -369,43 +368,6 @@ export default function SettingsPage() {
                     </div>
                   )}
 
-                  {/* PRIVACY */}
-                  {key === "privacy" && (
-                    <div className="space-y-3">
-                      {[
-                        { id: "biometricUnlock", label: "Biometric / Face ID unlock", desc: "Unlock app with Face ID or fingerprint" },
-                        { id: "shareWithProviders", label: "Share data with care team", desc: "Your care team can view your health data" },
-                      ].map((n) => (
-                        <div key={n.id} className="flex items-center justify-between py-2 border-b border-divider">
-                          <div>
-                            <p className="text-label-sm font-semibold text-text-primary">{n.label}</p>
-                            <p className="text-xs text-text-tertiary">{n.desc}</p>
-                          </div>
-                          <button
-                            onClick={() => toggle(n.id as keyof typeof toggles)}
-                            className={clsx("relative w-11 h-6 rounded-full transition-all duration-200 flex-shrink-0", toggles[n.id as keyof typeof toggles] ? "bg-accent-violet" : "bg-divider")}
-                            role="switch"
-                            aria-checked={toggles[n.id as keyof typeof toggles]}
-                            aria-label={`Toggle ${n.label}`}
-                          >
-                            <span className={clsx("absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all", toggles[n.id as keyof typeof toggles] ? "left-5" : "left-0.5")} />
-                          </button>
-                        </div>
-                      ))}
-                      <div className="pt-1 space-y-1">
-                        {[
-                          { icon: Lock, label: "Session timeout: 30 minutes idle" },
-                          { icon: Shield, label: "AES-256 encryption at rest" },
-                          { icon: Globe, label: "Data stored in ap-south-1 (Mumbai) — DPDP Act 2023" },
-                        ].map(({ icon: I, label }) => (
-                          <div key={label} className="flex items-center gap-2 text-xs text-text-tertiary">
-                            <I size={12} aria-hidden="true" />
-                            <span>{label}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
 
                   {/* DATA & EXPORT */}
                   {key === "data" && (

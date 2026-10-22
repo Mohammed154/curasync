@@ -92,7 +92,7 @@ export default function AlreadyOnboardedNotice() {
               Account Already Set Up
             </h1>
             <p className="text-sm text-text-secondary leading-relaxed max-w-sm mx-auto">
-              You already have an active health profile associated with this account. If you want to view your vitals or log a new reading, head over to your dashboard. To set up a profile for another individual, please sign out first.
+              You are currently signed in with an active health profile. To view your vitals or log a new reading, proceed to your dashboard. If you need to set up a profile for another individual, please sign out first.
             </p>
           </div>
 
@@ -107,7 +107,7 @@ export default function AlreadyOnboardedNotice() {
               <ArrowRight size={16} className="transition-transform group-hover:translate-x-0.5" />
             </Link>
 
-            {/* Secondary Button: Sign Out / Switch Account */}
+            {/* Secondary Button: Sign Out & Create New Account */}
             <button
               type="button"
               onClick={handleSignOutAndSwitch}
@@ -122,7 +122,7 @@ export default function AlreadyOnboardedNotice() {
               ) : (
                 <>
                   <LogOut size={16} className="text-text-tertiary" />
-                  <span>Sign Out / Switch Account</span>
+                  <span>Sign Out & Create New Account</span>
                 </>
               )}
             </button>

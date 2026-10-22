@@ -82,6 +82,7 @@ export default function LoginPage() {
       }
 
       const hasCompleted = Boolean(
+        prof.onboarding_completed ||
         prof.onboarding_complete ||
         (Array.isArray(prof.conditions) && prof.conditions.length > 0)
       );

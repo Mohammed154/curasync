@@ -65,13 +65,13 @@ export async function GET(request: NextRequest) {
     const supabase = getSupabaseAdminClient();
     const { data: profile } = await supabase
       .from("profiles")
-      .select("id, onboarding_complete, conditions, role")
+      .select("id, onboarding_complete, onboarding_completed, conditions, role")
       .eq("id", uid)
       .maybeSingle();
 
     const { data: patientProfile } = await supabase
       .from("patient_profiles")
-      .select("id, onboarding_complete, conditions")
+      .select("id, onboarding_complete, onboarding_completed, conditions")
       .eq("user_id", uid)
       .maybeSingle();
 
@@ -84,7 +84,9 @@ export async function GET(request: NextRequest) {
     const mergedConditions = profileConditions.length > 0 ? profileConditions : patientConditions;
 
     const hasCompletedOnboarding = Boolean(
+      profile?.onboarding_completed ||
       profile?.onboarding_complete ||
+      patientProfile?.onboarding_completed ||
       patientProfile?.onboarding_complete ||
       mergedConditions.length > 0
     );

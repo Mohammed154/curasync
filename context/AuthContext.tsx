@@ -20,6 +20,7 @@ export interface UserProfile {
   created_at: string;
   last_report_sent_at: string | null;
   onboarding_complete?: boolean;
+  onboarding_completed?: boolean;
   conditions?: string[];
   date_of_birth?: string;
   latitude?: number | null;
@@ -172,6 +173,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (typeof window !== "undefined") {
             const isProvider = syncedProfile?.role === "provider" || syncedProfile?.role === "doctor" || syncedProfile?.role === "admin";
             const hasCompleted = Boolean(
+              syncedProfile?.onboarding_completed ||
               syncedProfile?.onboarding_complete ||
               (Array.isArray(syncedProfile?.conditions) && syncedProfile.conditions.length > 0)
             );

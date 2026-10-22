@@ -31,7 +31,14 @@ export function proxy(request: NextRequest) {
   const sessionToken = request.cookies.get("curasync_session")?.value;
   const uidToken = request.cookies.get("curasync_uid")?.value;
   const roleToken = request.cookies.get("curasync_role")?.value;
-  const isAuthenticated = Boolean(sessionToken || uidToken);
+  
+  const allCookies = request.cookies.getAll();
+  const hasSupabaseAuthCookie = allCookies.some(
+    (c) => (c.name.startsWith("sb-") && c.name.includes("-auth-token")) ||
+           c.name === "sb-access-token" ||
+           c.name === "supabase-auth-token"
+  );
+  const isAuthenticated = Boolean(sessionToken || uidToken || hasSupabaseAuthCookie);
 
   // 1. Dedicated Provider Sign-In Route (/provider/login)
   if (pathname === "/provider/login") {

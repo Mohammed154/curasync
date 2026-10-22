@@ -1,8 +1,9 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
-import AlreadyOnboardedNotice from "./AlreadyOnboardedNotice";
+import { getSupabaseBrowserClient } from "@/lib/supabase";
+import OnboardingGateNotice from "./OnboardingGateNotice";
 
 interface OnboardingGuardProps {
   children: React.ReactNode;
@@ -13,34 +14,63 @@ export default function OnboardingGuard({
   children,
   serverAlreadyOnboarded = false,
 }: OnboardingGuardProps) {
-  const { user, profile, loading } = useAuth();
+  const { user, profile } = useAuth();
+  const [supabaseCompleted, setSupabaseCompleted] = useState<boolean | null>(null);
 
-  // If server check already verified the user is onboarded, render notice card immediately
-  if (serverAlreadyOnboarded) {
-    return <AlreadyOnboardedNotice />;
+  // Check Supabase browser session if user is logged in via Supabase directly
+  useEffect(() => {
+    let isMounted = true;
+    async function checkSupabaseSession() {
+      try {
+        const supabase = getSupabaseBrowserClient();
+        const { data } = await supabase.auth.getSession();
+        if (data?.session?.user) {
+          const { data: prof } = await supabase
+            .from("profiles")
+            .select("onboarding_complete, onboarding_completed, conditions")
+            .eq("id", data.session.user.id)
+            .maybeSingle();
+
+          const conditions = Array.isArray(prof?.conditions) ? prof.conditions : [];
+          if (
+            prof?.onboarding_completed === true ||
+            prof?.onboarding_complete === true ||
+            conditions.length > 0
+          ) {
+            if (isMounted) setSupabaseCompleted(true);
+            return;
+          }
+        }
+      } catch {
+        // ignore
+      }
+      if (isMounted) setSupabaseCompleted(false);
+    }
+
+    checkSupabaseSession();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // 1. If server check already verified completion, render gate notice
+  if (serverAlreadyOnboarded || supabaseCompleted === true) {
+    return <OnboardingGateNotice />;
   }
 
-  // Client-side verification
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-bg-light flex flex-col items-center justify-center p-4">
-        <div className="w-8 h-8 rounded-full border-2 border-accent-violet border-t-transparent animate-spin mb-3" />
-        <p className="text-xs text-text-tertiary">Verifying health profile...</p>
-      </div>
-    );
-  }
-
+  // 2. Client-side verification for authenticated & completed patient
   if (user) {
     const isCompleted = Boolean(
-      profile?.onboarding_complete ||
+      profile?.onboarding_completed === true ||
+      profile?.onboarding_complete === true ||
       (Array.isArray(profile?.conditions) && profile.conditions.length > 0)
     );
 
     if (isCompleted) {
-      return <AlreadyOnboardedNotice />;
+      return <OnboardingGateNotice />;
     }
   }
 
-  // Unauthenticated users or users with incomplete onboarding continue to the questionnaire
+  // Guest or incomplete patient continues to the wizard
   return <>{children}</>;
 }

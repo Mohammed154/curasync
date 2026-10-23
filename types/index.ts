@@ -30,7 +30,20 @@ export type BiometricType =
   | "steps"
   | "sleep_hours"
   | "body_temp"
-  | "peak_flow";
+  | "peak_flow"
+  | "creatinine"
+  | "bun"
+  | "tsh"
+  | "free_t4"
+  | "free_t3"
+  | "levothyroxine_dose"
+  | "crp"
+  | "esr"
+  | "pain_scale"
+  | "morning_stiffness"
+  | "asthma_control"
+  | "rescue_inhaler_use"
+  | "trigger_events";
 
 export type MedicationFrequency =
   | "once_daily"

@@ -81,6 +81,7 @@ export const profiles = pgTable("profiles", {
 export const vitals = pgTable("vitals", {
   id:         uuid("id").primaryKey().defaultRandom(),
   userId:     text("user_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+  patientId:  text("patient_id"),
   type:       text("type").notNull(),
   value:      numeric("value").notNull(),
   unit:       text("unit").notNull(),

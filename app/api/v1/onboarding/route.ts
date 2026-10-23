@@ -298,6 +298,24 @@ export async function PATCH(request: NextRequest) {
       console.warn("[onboarding:PATCH] Profile update warning:", error.message);
     }
 
+    // Also keep patient_profiles in sync
+    if (Array.isArray(body.conditions) || body.onboarding_complete !== undefined) {
+      const patientUpdate: Record<string, any> = {
+        updated_at: new Date().toISOString(),
+      };
+      if (Array.isArray(body.conditions)) patientUpdate.conditions = body.conditions;
+      if (body.onboarding_complete !== undefined) patientUpdate.onboarding_complete = Boolean(body.onboarding_complete);
+
+      try {
+        await supabase
+          .from("patient_profiles")
+          .update(patientUpdate)
+          .eq("user_id", authCtx.userId);
+      } catch (e) {
+        console.warn("[onboarding:PATCH] patient_profiles update warning:", e);
+      }
+    }
+
     return NextResponse.json({
       success: true,
       profile: data || updatePayload,

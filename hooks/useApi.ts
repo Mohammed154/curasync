@@ -28,13 +28,15 @@ async function fetcher<T>(url: string): Promise<T> {
 
 // ─── Readings ─────────────────────────────────────────────────────────────────
 
-interface Reading {
+export interface Reading {
   id: string;
   type: string;
   value: string;
   unit: string;
   recordedAt: string;
   source: string;
+  patientId?: string;
+  notes?: string;
 }
 
 export function useReadings(type?: BiometricType, limit = 100) {

@@ -194,6 +194,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (currentUser) {
         await syncUserToSupabase(currentUser);
       } else {
+        try {
+          const res = await fetch("/api/auth/session");
+          if (res.ok) {
+            const json = await res.json();
+            if (json.authenticated && json.user) {
+              setProfile(json.user);
+              setLoading(false);
+              return;
+            }
+          }
+        } catch {
+          // ignore
+        }
         setProfile(null);
       }
       setLoading(false);

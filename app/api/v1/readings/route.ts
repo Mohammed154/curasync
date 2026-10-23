@@ -13,12 +13,26 @@ const BiometricTypeEnum = z.enum([
   "blood_glucose","blood_pressure_systolic","blood_pressure_diastolic",
   "heart_rate","hrv","spo2","weight","hba1c","egfr",
   "cholesterol_ldl","cholesterol_hdl","steps","sleep_hours","body_temp","peak_flow",
+  // Condition-specific types:
+  "creatinine","bun","tsh","free_t4","free_t3","levothyroxine_dose",
+  "crp","esr","pain_scale","morning_stiffness","asthma_control","rescue_inhaler_use","trigger_events",
+  // Common aliases:
+  "levo_dose","pain_avg","morning_stiff","control_test_score","test_score","rescue_use",
 ]);
+
+const METRIC_TYPE_ALIASES: Record<string, string> = {
+  levo_dose: "levothyroxine_dose",
+  pain_avg: "pain_scale",
+  morning_stiff: "morning_stiffness",
+  control_test_score: "asthma_control",
+  test_score: "asthma_control",
+  rescue_use: "rescue_inhaler_use",
+};
 
 const ReadingSchema = z.object({
   type:       BiometricTypeEnum,
   value:      z.number().finite(),
-  unit:       z.string().min(1).max(20),
+  unit:       z.string().min(1).max(30),
   source:     z.literal("manual").default("manual"),
   recordedAt: z.string().datetime(),
   notes:      z.string().max(500).optional(),
@@ -59,7 +73,9 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { type, value, unit, source, recordedAt, notes } = parsed.data;
+  const rawType = parsed.data.type;
+  const type = (METRIC_TYPE_ALIASES[rawType] || rawType) as any;
+  const { value, unit, source, recordedAt, notes } = parsed.data;
   const triggeredAlerts = evaluateReading(authCtx.patientId, type, value);
 
   // Write to DB if configured
@@ -87,9 +103,10 @@ export async function POST(request: NextRequest) {
         })
         .onConflictDoNothing();
 
-      // 1. Insert into public.vitals table (user_id is TEXT referencing public.profiles(id))
+      // 1. Insert into public.vitals table (user_id and patient_id both populated)
       const [insertedVital] = await db.insert(vitals).values({
         userId:     authCtx.userId,
+        patientId:  authCtx.patientId || authCtx.userId,
         type,
         value:      String(value),
         unit,
@@ -269,10 +286,10 @@ export async function GET(request: NextRequest) {
 
   try {
     const { db, vitals, readings } = await import("@/lib/db");
-    const { eq, and, desc, gte, lte } = await import("drizzle-orm");
+    const { eq, or, and, desc, gte, lte } = await import("drizzle-orm");
 
     const vitalFilters = [
-      eq(vitals.userId, authCtx.userId),
+      or(eq(vitals.userId, authCtx.userId), eq(vitals.patientId, authCtx.userId)),
       ...(type ? [eq(vitals.type, type)] : []),
       ...(rangeStart ? [gte(vitals.recordedAt, new Date(rangeStart))] : []),
       ...(rangeEnd ? [lte(vitals.recordedAt, new Date(rangeEnd))] : []),
